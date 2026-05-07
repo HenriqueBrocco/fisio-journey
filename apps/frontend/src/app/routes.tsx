@@ -12,6 +12,7 @@ import MyPatientsPage from "../pages/MyPatientsPage";
 import PatientDetailsPage from "../pages/PatientDetailsPage";
 import PrescribeExercisePage from "../pages/PrescribeExercisePage";
 import PatientAssignmentsPage from "../pages/PatientAssignmentsPage";
+import UserSessionPage from "../pages/UserSessionPage";
 
 export default function AppRoutes() {
   return (
@@ -96,6 +97,15 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <PatientAssignmentsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/user/session"
+        element={
+          <ProtectedRoute>
+            <UserSessionPage />
           </ProtectedRoute>
         }
       />
