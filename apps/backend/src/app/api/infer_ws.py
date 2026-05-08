@@ -14,7 +14,7 @@ from app.models.session import SessionSummary as SessionSummaryModel
 from app.models.user import User
 from app.services.exercise_analysis.dispatcher import create_analyzer
 from app.services.pose_logic import rom_from_keypoints
-from app.services.pose_runtime import PoseRuntime
+from app.services.pose_runtime_tasks import PoseRuntimeTasks as PoseRuntime
 
 router = APIRouter(prefix="/infer", tags=["infer"])
 

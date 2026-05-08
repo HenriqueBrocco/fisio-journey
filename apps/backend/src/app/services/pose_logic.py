@@ -1,4 +1,3 @@
-# src/app/services/pose_logic.py
 from __future__ import annotations
 
 import math
