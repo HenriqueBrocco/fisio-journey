@@ -1,3 +1,5 @@
+import os
+
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,23 +17,13 @@ app = FastAPI(title="Fisio API", version="0.1.0")
 
 app.add_middleware(RequestLoggingMiddleware)
 
+origins_raw = os.getenv("BACKEND_CORS_ORIGINS", "")
+origins = [item.strip() for item in origins_raw.split(",") if item.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",  # se usar Vite
-        "http://localhost:8080",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "http://127.0.0.1:5500",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5000",
-        "http://127.0.0.1:5353",
-        "http://127.0.0.1:4321",
-        "http://127.0.0.1:51439",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1",  # Flutter Web dev server
-        "http://localhost",  # Flutter Web dev server
-    ],
+    allow_origins=origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,5 +31,4 @@ app.add_middleware(
 
 register_exception_handlers(app)
 
-# Rotas
 app.include_router(api_router, prefix="/v1")
