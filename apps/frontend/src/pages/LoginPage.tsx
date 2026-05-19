@@ -1,4 +1,4 @@
-import FisioPlayLogo from "@/components/FisioPlayLogo";
+import FisioJourneyLogo from "@/components/FisioJourneyLogo";
 import { useAuth } from "@/contexts/AuthContext";
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useState } from "react";
@@ -10,7 +10,7 @@ const Index = () => {
   const [password, setPassword] = useState("");
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const { login } = useAuth();
-  const navigate = useNavigate(); // 👈 novo
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +24,7 @@ const Index = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[image:var(--gradient-bg)] px-4 py-8">
+    <div className="flex min-h-screen items-start sm:items-center justify-center bg-[image:var(--gradient-bg)] px-4 py-8 overflow-y-auto">
       {/* Decorative blobs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
@@ -33,15 +33,12 @@ const Index = () => {
 
       <div className="relative z-10 w-full max-w-md animate-fade-up">
         {/* Card */}
-        <div className="rounded-2xl border border-border/60 bg-card p-8 shadow-card sm:p-10">
+        <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-card sm:p-10">
           {/* Logo */}
           <div className="mb-2 flex justify-center">
-            <FisioPlayLogo />
+            <FisioJourneyLogo className="w-40 sm:w-48 md:w-56 h-auto mx-auto" />
           </div>
-          <p className="mb-8 text-center text-sm text-muted-foreground">
-            Exercícios guiados com acompanhamento inteligente
-          </p>
-
+          
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email */}
             <div className="space-y-1.5">
@@ -49,17 +46,18 @@ const Index = () => {
                 E-mail
               </label>
               <div
-                className={`flex items-center gap-3 rounded-lg border-2 bg-background px-4 py-3 transition-all duration-200 ${
-                  focusedField === "email"
-                    ? "border-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.1)]"
-                    : "border-border hover:border-primary/40"
-                }`}
+                className={`flex items-center gap-3 rounded-lg border-2 bg-background px-4 py-3 transition-all duration-200 ${focusedField === "email"
+                  ? "border-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.1)]"
+                  : "border-border hover:border-primary/40"
+                  }`}
               >
                 <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <input
                   id="email"
                   type="email"
                   placeholder="seu@email.com"
+                  autoComplete="email"
+                  inputMode="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onFocus={() => setFocusedField("email")}
@@ -75,16 +73,16 @@ const Index = () => {
                 Senha
               </label>
               <div
-                className={`flex items-center gap-3 rounded-lg border-2 bg-background px-4 py-3 transition-all duration-200 ${
-                  focusedField === "password"
-                    ? "border-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.1)]"
-                    : "border-border hover:border-primary/40"
-                }`}
+                className={`flex items-center gap-3 rounded-lg border-2 bg-background px-4 py-3 transition-all duration-200 ${focusedField === "password"
+                  ? "border-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.1)]"
+                  : "border-border hover:border-primary/40"
+                  }`}
               >
                 <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -95,7 +93,7 @@ const Index = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                  className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
                   aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -123,18 +121,11 @@ const Index = () => {
             </button>
           </form>
 
-          {/* Sign up */}
-          <p className="mt-8 text-center text-sm text-muted-foreground">
-            Ainda não tem conta?{" "}
-            <button className="font-semibold text-primary transition-colors hover:text-primary/80">
-              Criar conta
-            </button>
-          </p>
         </div>
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-muted-foreground/60">
-          © 2026 Fisio Play · Reabilitação inteligente
+          © 2026 Fisio Journey · Reabilitação inteligente
         </p>
       </div>
     </div>

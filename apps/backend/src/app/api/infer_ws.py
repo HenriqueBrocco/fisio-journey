@@ -65,8 +65,7 @@ async def ws_infer_session(websocket: WebSocket, session_id: str):
     sess: SessionModel | None = None
 
     try:
-        # ---- autenticação (recomendado) ----
-        # Se você ainda não quiser auth no WS, pode comentar este bloco.
+        # Autenticação
         token = _get_token_from_ws(websocket)
         if not token:
             await websocket.send_json(
@@ -76,7 +75,6 @@ async def ws_infer_session(websocket: WebSocket, session_id: str):
             return
 
         # Reusa sua função de validação de token / current user
-        # Ajuste o import conforme seu projeto:
         from app.api.deps import get_current_user_from_token  # crie essa função se não existir
 
         user = get_current_user_from_token(db, token)

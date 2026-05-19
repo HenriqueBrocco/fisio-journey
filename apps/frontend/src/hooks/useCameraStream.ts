@@ -54,12 +54,16 @@ const WS_BASE = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000";
 
 export function useCameraStream(options: UseCameraStreamOptions = {}): UseCameraStreamReturn {
   const {
-    wsUrl = `${WS_BASE}/ws/camera`,
+    wsUrl,
     fps = 8,
     width = 640,
     height = 480,
     jpegQuality = 0.6,
   } = options;
+
+  if (!wsUrl) {
+    throw new Error("useCameraStream: wsUrl é obrigatório (ex.: /v1/infer/ws/session/{id}?token=...)");
+  }
 
   // Refs de DOM (passados ao componente de vídeo)
   const videoRef = useRef<HTMLVideoElement>(null);

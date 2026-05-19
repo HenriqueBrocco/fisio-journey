@@ -6,5 +6,5 @@ export function RoleRedirect() {
   const { loading, isPro, isAuthenticated } = useAuth();
   if (loading) return <div>Carregando...</div>;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  return isPro ? <Navigate to="/dashboard" replace /> : <Navigate to="/dashboard-x" replace />;
+  return isPro ? <Navigate to="/pro/dashboard" replace /> : <Navigate to="/dashboard" replace />;
 }

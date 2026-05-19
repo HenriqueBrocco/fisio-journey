@@ -5,12 +5,14 @@
  * Exibe o preview ao vivo, controles de start/stop e feedback de status.
  * Não contém lógica de visão computacional — apenas captura e transmite.
  */
-
+import { getToken } from "@/lib/storage";
 import { useCameraStream } from "@/hooks/useCameraStream";
 import { cn } from "@/lib/utils";
 import { Camera, CameraOff, Loader2, Radio, Wifi, WifiOff } from "lucide-react";
 
 // ─── Indicador de status da câmera ──────────────────────────────────────────
+
+const WS_BASE_URL = (import.meta.env.VITE_WS_URL || "").replace(/\/$/, "");
 
 const CAMERA_LABELS: Record<string, string> = {
   idle: "Câmera inativa",
@@ -30,14 +32,21 @@ const WS_LABELS: Record<string, string> = {
 // ─── Componente principal ────────────────────────────────────────────────────
 
 interface CameraStreamProps {
-  /** Classe CSS extra para o wrapper externo */
   className?: string;
   fps?: number;
   width?: number;
   height?: number;
+  sessionId: string;
 }
 
-export function CameraStream({ className, fps = 8, width = 640, height = 480 }: CameraStreamProps) {
+function buildWsUrl(sessionId: string, token: string) {
+  return `${WS_BASE_URL}/v1/infer/ws/session/${encodeURIComponent(sessionId)}?token=${encodeURIComponent(token)}`;
+}
+
+export function CameraStream({ className, fps = 8, width = 640, height = 480, sessionId }: CameraStreamProps) {
+  const token = getToken() || "";
+  const wsUrl = buildWsUrl(sessionId, token);
+
   const {
     videoRef,
     canvasRef,
@@ -47,7 +56,7 @@ export function CameraStream({ className, fps = 8, width = 640, height = 480 }: 
     frameCount,
     start,
     stop,
-  } = useCameraStream({ fps, width, height });
+  } = useCameraStream({ wsUrl, fps, width, height });
 
   const isActive = cameraStatus === "active";
   const isLoading = cameraStatus === "requesting";
@@ -185,6 +194,15 @@ export function CameraStream({ className, fps = 8, width = 640, height = 480 }: 
         {lastMessage?.status === "ok" && (
           <div className="flex items-center gap-1 text-muted-foreground">
             <span>Backend: {lastMessage.width}×{lastMessage.height}</span>
+          </div>
+        )}
+
+        {lastMessage && (
+          <div className="mx-auto w-full max-w-xl rounded-xl border border-border/60 bg-card/80 p-3 text-xs backdrop-blur">
+            <p className="mb-2 font-medium">Última mensagem (WS)</p>
+            <pre className="whitespace-pre-wrap break-words">
+              {JSON.stringify(lastMessage, null, 2)}
+            </pre>
           </div>
         )}
       </div>

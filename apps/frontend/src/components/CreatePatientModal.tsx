@@ -1,10 +1,11 @@
-import React, { useState } from "react";
-import { createPatient } from "../services/patients";
+import { useState } from "react";
+import { createPatient } from "@/services/patients";
+import { X } from "lucide-react";
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onCreated?: () => void; // pra dar refresh na lista/counters depois
+  onCreated?: () => void;
 };
 
 export default function CreatePatientModal({ open, onClose, onCreated }: Props) {
@@ -25,22 +26,19 @@ export default function CreatePatientModal({ open, onClose, onCreated }: Props) 
   };
 
   const handleClose = () => {
-    if (!saving) {
-      reset();
-      onClose();
-    }
+    if (saving) return;
+    reset();
+    onClose();
   };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
-
     try {
       await createPatient({ name, email, password });
       onCreated?.();
-      reset();
-      onClose();
+      handleClose();
     } catch (err: any) {
       setError(err?.message || "Erro ao criar paciente");
     } finally {
@@ -49,51 +47,96 @@ export default function CreatePatientModal({ open, onClose, onCreated }: Props) 
   };
 
   return (
-    <div style={styles.backdrop} onMouseDown={handleClose}>
-      <div style={styles.modal} onMouseDown={(e) => e.stopPropagation()}>
-        <div style={styles.header}>
-          <h3 style={{ margin: 0 }}>Cadastrar paciente</h3>
-          <button onClick={handleClose} style={styles.closeBtn} aria-label="Fechar">
-            ✕
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center px-4"
+      onMouseDown={handleClose}
+    >
+      {/* backdrop */}
+      <div className="absolute inset-0 bg-black/40" />
+
+      {/* modal */}
+      <div
+        className="relative w-full max-w-lg rounded-2xl border border-border/60 bg-card text-foreground shadow-card backdrop-blur p-5"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold tracking-tight">Cadastrar paciente</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Cria um usuário paciente vinculado ao seu perfil.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleClose}
+            className="rounded-full border border-border/60 p-2 hover:bg-muted/50 transition"
+            aria-label="Fechar"
+          >
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={onSubmit} style={{ display: "grid", gap: 12, marginTop: 12 }}>
-          <label style={styles.label}>
-            Nome
-            <input style={styles.input} value={name} onChange={(e) => setName(e.target.value)} required />
-          </label>
+        {error && (
+          <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+            {error}
+          </div>
+        )}
 
-          <label style={styles.label}>
-            Email
+        <form onSubmit={onSubmit} className="mt-4 grid gap-4">
+          <div className="grid gap-1.5">
+            <label className="text-sm font-medium">Nome</label>
             <input
-              style={styles.input}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-[hsl(var(--ring)/0.35)]"
+              placeholder="Ex.: Julio"
+            />
+          </div>
+
+          <div className="grid gap-1.5">
+            <label className="text-sm font-medium">E-mail</label>
+            <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               type="email"
+              autoComplete="email"
+              inputMode="email"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-[hsl(var(--ring)/0.35)]"
+              placeholder="julio@exemplo.com"
             />
-          </label>
+          </div>
 
-          <label style={styles.label}>
-            Senha
+          <div className="grid gap-1.5">
+            <label className="text-sm font-medium">Senha</label>
             <input
-              style={styles.input}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               type="password"
+              autoComplete="new-password"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-[hsl(var(--ring)/0.35)]"
+              placeholder="••••••••"
             />
-          </label>
+          </div>
 
-          {error && <div style={styles.error}>{error}</div>}
-
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
-            <button type="button" onClick={handleClose} disabled={saving} style={styles.secondaryBtn}>
+          <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={handleClose}
+              disabled={saving}
+              className="w-full sm:w-auto rounded-xl border px-4 py-2 text-sm hover:bg-muted/50 transition disabled:opacity-60"
+            >
               Cancelar
             </button>
-            <button type="submit" disabled={saving} style={styles.primaryBtn}>
-              {saving ? "Salvando..." : "Criar"}
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full sm:w-auto rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground shadow-button hover:opacity-90 transition disabled:opacity-60"
+            >
+              {saving ? "Criando..." : "Criar"}
             </button>
           </div>
         </form>
@@ -101,70 +144,3 @@ export default function CreatePatientModal({ open, onClose, onCreated }: Props) 
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  backdrop: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.35)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
-    zIndex: 9999,
-  },
-  modal: {
-    width: "100%",
-    maxWidth: 520,
-    background: "white",
-    borderRadius: 16,
-    padding: 18,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.20)",
-  },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  closeBtn: {
-    border: "none",
-    background: "transparent",
-    fontSize: 18,
-    cursor: "pointer",
-  },
-  label: {
-    display: "grid",
-    gap: 6,
-    fontSize: 14,
-  },
-  input: {
-    height: 38,
-    borderRadius: 10,
-    border: "1px solid #d0d7de",
-    padding: "0 12px",
-    outline: "none",
-  },
-  primaryBtn: {
-    height: 38,
-    borderRadius: 10,
-    border: "none",
-    padding: "0 14px",
-    cursor: "pointer",
-  },
-  secondaryBtn: {
-    height: 38,
-    borderRadius: 10,
-    border: "1px solid #d0d7de",
-    padding: "0 14px",
-    cursor: "pointer",
-    background: "white",
-  },
-  error: {
-    padding: 10,
-    borderRadius: 10,
-    background: "#ffe8e8",
-    color: "#9b1c1c",
-    fontSize: 14,
-  },
-};

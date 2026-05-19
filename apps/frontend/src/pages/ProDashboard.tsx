@@ -1,34 +1,31 @@
-import React, { useEffect, useMemo, useState } from "react";
-import FisioPlayLogo from "@/components/FisioPlayLogo";
-import { Link } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-import { apiFetch } from "../lib/api";
-import CreatePatientModal from "../components/CreatePatientModal";
+import { useEffect, useMemo, useState } from "react";
+import FisioJourneyLogo from "@/components/FisioJourneyLogo";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api";
+import CreatePatientModal from "@/components/CreatePatientModal";
+import { useTheme } from "@/hooks/useTheme";
+import { Calendar, Dumbbell, LogOut, Moon, Plus, Sun, Users, RefreshCw } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 
 type Patient = {
   id: string;
   name: string;
   email: string;
-  role?: string;
 };
 
 type Exercise = {
   id: number;
   title: string;
-  description?: string;
-  body_focus?: string;
-  analysis_kind?: string;
-  created_at?: string;
 };
 
 export default function ProDashboard() {
   const { me, logout, isPro } = useAuth();
+  const { theme, toggle } = useTheme();
+  const navigate = useNavigate();
 
   const [createPatientOpen, setCreatePatientOpen] = useState(false);
-
   const [patients, setPatients] = useState<Patient[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +41,8 @@ export default function ProDashboard() {
       setExercises(Array.isArray(e) ? e : []);
     } catch (err: any) {
       setError(err?.message || "Erro ao carregar dados do dashboard.");
+      setPatients([]);
+      setExercises([]);
     } finally {
       setLoading(false);
     }
@@ -56,126 +55,189 @@ export default function ProDashboard() {
   }, [isPro]);
 
   const recentPatients = useMemo(() => {
-    // Sem created_at no patient: só pega os primeiros 5 (ou ordena por name)
     return [...patients].sort((a, b) => (a.name || "").localeCompare(b.name || "")).slice(0, 5);
   }, [patients]);
 
   if (!isPro) {
     return (
-      <div style={{ padding: 24 }}>
-        <h2>Acesso negado</h2>
-        <p>Somente usuários com role PRO podem acessar este dashboard.</p>
+      <div className="min-h-screen bg-[image:var(--gradient-bg)] px-4 py-6">
+        <div className="mx-auto max-w-3xl rounded-2xl border border-border/60 bg-card/80 p-6 shadow-sm backdrop-blur">
+          <h1 className="text-lg font-semibold">Acesso negado</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Somente usuários com role PRO podem acessar este dashboard.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={styles.page}>
+    <div className="min-h-screen bg-[image:var(--gradient-bg)] px-4 py-6 sm:py-8">
       {/* Header */}
-      <div style={styles.header}>
-        <div style={styles.brand}>
-          <FisioPlayLogo />
-          <div style={styles.titleRow}>
-            <div style={styles.welcome}>Bem-vindo(a), {me?.name} 👋</div>
+      <header className="mx-auto flex w-full max-w-6xl flex-col gap-4 rounded-2xl bg-card/80 px-4 py-4 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="flex items-center gap-3">
+          <FisioJourneyLogo className="w-10 sm:w-12 h-auto" />
+          <div>
+            <h1 className="text-base font-semibold tracking-tight sm:text-lg">Fisio Journey</h1>
+            <p className="text-xs text-muted-foreground">
+              Portal do Profissional · {me?.name || me?.email} 👋
+            </p>
           </div>
         </div>
 
-        <button onClick={logout} style={styles.logoutBtn}>
-          Sair
-        </button>
-      </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={toggle}
+            className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-medium hover:bg-muted/50 transition"
+            title="Alternar tema"
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {theme === "dark" ? "Claro" : "Escuro"}
+          </button>
 
-      {/* Cards */}
-      <div style={styles.cards}>
-        <StatCard label="Meus pacientes" value={patients.length} icon="👥" />
-        <StatCard label="Exercícios cadastrados" value={exercises.length} icon="🏋️" />
-        <StatCard label="Pendências" value={"—"} icon="✅" helper="(em breve)" />
-      </div>
+          <button
+            onClick={logout}
+            className="inline-flex items-center gap-2 rounded-full border border-destructive/40 px-4 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition"
+          >
+            <LogOut className="h-4 w-4" />
+            Sair
+          </button>
+        </div>
+      </header>
 
-      {/* Main grid */}
-      <div style={styles.grid}>
-        {/* Left panel */}
-        <div style={styles.panel}>
-          <div style={styles.panelHeader}>
-            <div>
-              <div style={styles.panelTitle}>Meus pacientes</div>
-              <div style={styles.panelSubtitle}>
-                Lista inicial (vamos integrar filtros/ordenação depois).
+      <main className="mx-auto mt-6 flex w-full max-w-6xl flex-col gap-6">
+        {/* Cards */}
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Meus pacientes</span>
+              <Users className="h-4 w-4 text-primary" />
+            </div>
+            <p className="mt-3 text-3xl font-semibold tracking-tight">{loading ? "…" : patients.length}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Total vinculados</p>
+          </div>
+
+          <div className="rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Exercícios</span>
+              <Dumbbell className="h-4 w-4 text-primary" />
+            </div>
+            <p className="mt-3 text-3xl font-semibold tracking-tight">{loading ? "…" : exercises.length}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Total no catálogo</p>
+          </div>
+
+          <div className="rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Acompanhamento</span>
+              <Calendar className="h-4 w-4 text-primary" />
+            </div>
+            <p className="mt-3 text-3xl font-semibold tracking-tight">—</p>
+            <p className="mt-1 text-xs text-muted-foreground">Em breve (sessões / resultados)</p>
+          </div>
+        </section>
+
+        {/* Main */}
+        <section className="grid gap-4 lg:grid-cols-[2fr,1.2fr]">
+          {/* Pacientes recentes */}
+          <div className="rounded-2xl border border-border/60 bg-card/80 shadow-sm backdrop-blur overflow-hidden">
+            <div className="flex flex-col gap-3 px-5 py-4 border-b border-border/60 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-sm font-semibold tracking-tight">Meus pacientes</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Ordenado por nome (visão rápida).
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={fetchAll}
+                  disabled={loading}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm hover:bg-muted/50 transition"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  {loading ? "Atualizando..." : "Atualizar"}
+                </button>
+
+                <button
+                  onClick={() => setCreatePatientOpen(true)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground shadow-button hover:opacity-90 transition"
+                >
+                  <Plus className="h-4 w-4" />
+                  Cadastrar
+                </button>
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={fetchAll} style={styles.smallBtn} disabled={loading}>
-                {loading ? "Atualizando..." : "Atualizar"}
-              </button>
-              <button onClick={() => setCreatePatientOpen(true)} style={styles.primaryBtn}>
-                + Cadastrar paciente
-              </button>
-            </div>
-          </div>
+            {error && (
+              <div className="m-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                {error}
+              </div>
+            )}
 
-          {error && <div style={styles.errorBox}>{error}</div>}
-
-          {loading ? (
-            <div style={{ padding: 16 }}>Carregando...</div>
-          ) : recentPatients.length === 0 ? (
-            <div style={{ padding: 16, color: "#6b7280" }}>
-              Nenhum paciente cadastrado ainda.
-            </div>
-          ) : (
-            <div style={styles.list}>
-              {recentPatients.map((p) => (
-                <div key={p.id} style={styles.listItem}>
-                  <div>
-                    <div style={styles.itemTitle}>{p.name}</div>
-                    <div style={styles.itemSubtitle}>{p.email}</div>
-                  </div>
-                  <span style={styles.badge}>Ativo</span>
+            <div className="p-3">
+              {loading ? (
+                <div className="p-4 text-sm text-muted-foreground">Carregando…</div>
+              ) : recentPatients.length === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground">Nenhum paciente cadastrado ainda.</div>
+              ) : (
+                <div className="grid gap-3">
+                  {recentPatients.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => navigate(`/patients/${p.id}`)}
+                      className="w-full rounded-2xl border border-border/60 bg-background/60 px-4 py-3 text-left hover:bg-background/80 transition"
+                    >
+                      <p className="text-sm font-semibold">{p.name}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{p.email}</p>
+                    </button>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
 
-          <div style={{ padding: 16, borderTop: "1px solid #eef2f7" }}>
-            <Link to="/patients" style={styles.link}>
-              Ver todos os pacientes
-            </Link>
-          </div>
-        </div>
-
-        {/* Right panel */}
-        <div style={styles.panel}>
-          <div style={styles.panelHeader}>
-            <div>
-              <div style={styles.panelTitle}>Ações rápidas</div>
-              <div style={styles.panelSubtitle}>Atalhos para as tarefas mais comuns.</div>
+            <div className="px-5 py-4 border-t border-border/60">
+              <Link to="/patients" className="text-xs font-medium text-primary hover:opacity-80 transition">
+                Ver todos os pacientes →
+              </Link>
             </div>
           </div>
 
-          <div style={{ padding: 16, display: "grid", gap: 12 }}>
-            <button onClick={() => setCreatePatientOpen(true)} style={styles.actionBtn}>
-              Cadastrar paciente
-              <span style={styles.actionHint}>Cria um paciente (role PATIENT)</span>
-            </button>
+          {/* Ações rápidas */}
+          <div className="rounded-2xl border border-border/60 bg-card/80 p-5 shadow-sm backdrop-blur">
+            <h2 className="text-sm font-semibold tracking-tight">Ações rápidas</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Atalhos para o que você mais usa.</p>
 
-            <Link to="/exercises/new" style={{ textDecoration: "none" }}>
-              <div style={styles.actionBtn as React.CSSProperties}>
+            <div className="mt-4 grid gap-3">
+              <button
+                onClick={() => navigate("/patients")}
+                className="w-full rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground shadow-button hover:opacity-90 transition"
+              >
+                Meus pacientes
+              </button>
+
+              <button
+                onClick={() => setCreatePatientOpen(true)}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm hover:bg-muted/50 transition"
+              >
+                <Plus className="h-4 w-4" />
+                Cadastrar paciente
+              </button>
+
+              <button
+                onClick={() => navigate("/exercises/new")}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm hover:bg-muted/50 transition"
+              >
+                <Plus className="h-4 w-4" />
                 Cadastrar exercício
-                <span style={styles.actionHint}>Cria um exercício no catálogo</span>
-              </div>
-            </Link>
+              </button>
+            </div>
 
-            <div style={styles.todoBox}>
-              <div style={styles.todoTitle}>Próximos passos</div>
-              <ul style={styles.todoList}>
-                <li>Listagem completa de pacientes (com busca).</li>
-                <li>Listagem completa de exercícios (com filtros).</li>
-                <li>Prescrição (assignments) por paciente.</li>
-              </ul>
+            <div className="mt-6 rounded-xl border border-border/60 bg-background/60 p-4 text-xs text-muted-foreground">
+              Próximo: acompanhar sessões/sumários dos pacientes.
             </div>
           </div>
-        </div>
-      </div>
+        </section>
+      </main>
 
       <CreatePatientModal
         open={createPatientOpen}
@@ -185,194 +247,3 @@ export default function ProDashboard() {
     </div>
   );
 }
-
-function StatCard({
-  label,
-  value,
-  icon,
-  helper,
-}: {
-  label: string;
-  value: number | string;
-  icon: string;
-  helper?: string;
-}) {
-  return (
-    <div style={styles.card}>
-      <div style={styles.cardTop}>
-        <div style={styles.cardLabel}>{label}</div>
-        <div style={styles.cardIcon}>{icon}</div>
-      </div>
-      <div style={styles.cardValue}>{value}</div>
-      {helper && <div style={styles.cardHelper}>{helper}</div>}
-    </div>
-  );
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    background: "#f3f6fb",
-    padding: 22,
-  },
-  header: {
-    background: "white",
-    borderRadius: 16,
-    padding: "16px 18px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    boxShadow: "0 10px 22px rgba(15, 23, 42, 0.06)",
-    border: "1px solid #eef2f7",
-  },
-  brand: {
-    display: "flex",
-    alignItems: "center",
-    gap: 14,
-  },
-  logo: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    background: "linear-gradient(135deg, #06b6d4, #3b82f6)",
-    color: "white",
-    display: "grid",
-    placeItems: "center",
-    fontWeight: 800,
-  },
-  titleRow: { display: "flex", alignItems: "baseline", gap: 10 },
-  title: { fontSize: 18, fontWeight: 800, color: "#0f172a" },
-  subtitle: { fontSize: 14, color: "#64748b", fontWeight: 600 },
-  welcome: { marginTop: 2, fontSize: 12, color: "#64748b" },
-
-  logoutBtn: {
-    borderRadius: 999,
-    border: "1px solid #fecaca",
-    background: "white",
-    color: "#ef4444",
-    padding: "8px 12px",
-    cursor: "pointer",
-    fontWeight: 700,
-    display: "flex",
-    gap: 8,
-    alignItems: "center",
-  },
-
-  cards: {
-    marginTop: 18,
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: 16,
-  },
-  card: {
-    background: "white",
-    borderRadius: 16,
-    padding: 16,
-    border: "1px solid #eef2f7",
-    boxShadow: "0 10px 22px rgba(15, 23, 42, 0.06)",
-    minHeight: 92,
-  },
-  cardTop: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  cardLabel: { fontSize: 13, color: "#64748b", fontWeight: 700 },
-  cardIcon: { fontSize: 16, opacity: 0.9 },
-  cardValue: { marginTop: 10, fontSize: 30, fontWeight: 800, color: "#0f172a" },
-  cardHelper: { marginTop: 6, fontSize: 12, color: "#94a3b8" },
-
-  grid: {
-    marginTop: 16,
-    display: "grid",
-    gridTemplateColumns: "1.25fr 1fr",
-    gap: 16,
-  },
-  panel: {
-    background: "white",
-    borderRadius: 16,
-    border: "1px solid #eef2f7",
-    boxShadow: "0 10px 22px rgba(15, 23, 42, 0.06)",
-    overflow: "hidden",
-  },
-  panelHeader: {
-    padding: 16,
-    borderBottom: "1px solid #eef2f7",
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 12,
-    alignItems: "flex-start",
-  },
-  panelTitle: { fontSize: 14, fontWeight: 800, color: "#0f172a" },
-  panelSubtitle: { fontSize: 12, color: "#64748b", marginTop: 4 },
-
-  list: { padding: 10 },
-  listItem: {
-    padding: 12,
-    margin: 6,
-    borderRadius: 14,
-    border: "1px solid #eef2f7",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  itemTitle: { fontWeight: 800, color: "#0f172a" },
-  itemSubtitle: { fontSize: 12, color: "#64748b", marginTop: 4 },
-  badge: {
-    fontSize: 12,
-    padding: "6px 10px",
-    borderRadius: 999,
-    background: "#dcfce7",
-    color: "#166534",
-    fontWeight: 800,
-  },
-
-  errorBox: {
-    margin: 16,
-    padding: 12,
-    borderRadius: 12,
-    background: "#ffe8e8",
-    color: "#9b1c1c",
-    fontSize: 13,
-  },
-
-  smallBtn: {
-    height: 36,
-    borderRadius: 10,
-    border: "1px solid #e2e8f0",
-    background: "white",
-    padding: "0 12px",
-    cursor: "pointer",
-    fontWeight: 700,
-  },
-  primaryBtn: {
-    height: 36,
-    borderRadius: 10,
-    border: "none",
-    background: "#0ea5e9",
-    color: "white",
-    padding: "0 12px",
-    cursor: "pointer",
-    fontWeight: 800,
-  },
-  actionBtn: {
-    border: "1px solid #eef2f7",
-    background: "white",
-    borderRadius: 14,
-    padding: 14,
-    cursor: "pointer",
-    display: "grid",
-    gap: 6,
-    fontWeight: 900,
-    color: "#0f172a",
-  },
-  actionHint: { fontSize: 12, color: "#64748b", fontWeight: 600 },
-
-  todoBox: {
-    marginTop: 6,
-    padding: 14,
-    borderRadius: 14,
-    border: "1px solid #eef2f7",
-    background: "#f8fafc",
-  },
-  todoTitle: { fontWeight: 900, color: "#0f172a", marginBottom: 8 },
-  todoList: { margin: 0, paddingLeft: 18, color: "#475569", fontSize: 13, display: "grid", gap: 6 },
-
-  link: { color: "#0ea5e9", fontWeight: 800, textDecoration: "none", fontSize: 13 },
-};

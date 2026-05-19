@@ -190,7 +190,7 @@ export default function UserSessionPage() {
             </div>
 
             <button
-              onClick={() => navigate("/dashboard-x")}
+              onClick={() => navigate("/dashboard")}
               className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-medium hover:bg-muted/50 transition"
             >
               <ArrowLeft className="h-4 w-4" />

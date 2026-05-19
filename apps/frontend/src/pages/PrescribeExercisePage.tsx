@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-import { apiFetch } from "../lib/api";
-import { createAssignment, createAssignmentConfig } from "../services/assignments";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api";
+import { createAssignment, createAssignmentConfig } from "@/services/assignments";
+import { ArrowLeft, RefreshCw, Search, Sparkles } from "lucide-react";
 
 type Exercise = {
   id: number;
@@ -10,30 +11,31 @@ type Exercise = {
   description?: string;
   body_focus?: string;
   analysis_kind?: string;
-  created_at?: string;
 };
+
+type Patient = { id: string; name: string; email: string };
 
 export default function PrescribeExercisePage() {
   const { isPro } = useAuth();
   const { id } = useParams<{ id: string }>();
   const patientId = id || "";
-
   const nav = useNavigate();
 
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
   const [selectedExerciseId, setSelectedExerciseId] = useState<number | null>(null);
 
-  // Params como JSON texto (MVP)
   const [paramsText, setParamsText] = useState("{\n  \n}\n");
-
   const [schedule, setSchedule] = useState<"DAILY" | "WEEKLY" | "MONTHLY">("DAILY");
   const [active, setActive] = useState(true);
+
+  const [patient, setPatient] = useState<Patient | null>(null);
 
   const fetchExercises = async () => {
     setLoading(true);
@@ -43,6 +45,7 @@ export default function PrescribeExercisePage() {
       setExercises(Array.isArray(e) ? e : []);
     } catch (err: any) {
       setError(err?.message || "Erro ao carregar exercícios.");
+      setExercises([]);
     } finally {
       setLoading(false);
     }
@@ -50,9 +53,30 @@ export default function PrescribeExercisePage() {
 
   useEffect(() => {
     if (!isPro) return;
-    fetchExercises();
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [p, e] = await Promise.all([
+          apiFetch<Patient>(`/v1/patients/${patientId}`),
+          apiFetch<Exercise[]>("/v1/exercises"),
+        ]);
+
+        setPatient(p);
+        setExercises(Array.isArray(e) ? e : []);
+      } catch (err: any) {
+        setError(err?.message || "Erro ao carregar dados.");
+        setPatient(null);
+        setExercises([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPro]);
+  }, [isPro, patientId]);
 
   const selectedExercise = useMemo(() => {
     if (selectedExerciseId == null) return null;
@@ -71,15 +95,6 @@ export default function PrescribeExercisePage() {
       );
     });
   }, [exercises, query]);
-
-  if (!isPro) {
-    return (
-      <div style={{ padding: 24 }}>
-        <h2>Acesso negado</h2>
-        <p>Somente usuários com role PRO podem acessar esta tela.</p>
-      </div>
-    );
-  }
 
   const parseParams = () => {
     try {
@@ -114,14 +129,12 @@ export default function PrescribeExercisePage() {
 
     setSaving(true);
     try {
-      // 1) cria config
       const cfg = await createAssignmentConfig({
         exercise_id: selectedExerciseId,
         patient_user_id: patientId,
         params: paramsObj,
       });
 
-      // 2) cria assignment
       const asg = await createAssignment({
         patient_user_id: patientId,
         exercise_id: selectedExerciseId,
@@ -131,8 +144,6 @@ export default function PrescribeExercisePage() {
       });
 
       setSuccess(`Prescrição criada com sucesso (assignment id=${asg.id}).`);
-      // volta pro detalhe após um pequeno passo do usuário (ou automático)
-      // aqui vou só manter um botão "Voltar"
     } catch (err: any) {
       setError(err?.message || "Erro ao criar prescrição.");
     } finally {
@@ -140,288 +151,202 @@ export default function PrescribeExercisePage() {
     }
   };
 
-  return (
-    <div style={styles.page}>
-      <div style={styles.header}>
-        <div>
-          <Link to={`/patients/${patientId}`} style={styles.backLink}>
-            ← Voltar
-          </Link>
-          <div style={styles.title}>Prescrever exercício</div>
-          <div style={styles.subtitle}>Paciente: {patientId}</div>
+  if (!isPro) {
+    return (
+      <div className="min-h-screen bg-[image:var(--gradient-bg)] px-4 py-6 sm:py-8">
+        <div className="mx-auto max-w-3xl rounded-2xl border border-border/60 bg-card/80 p-6 shadow-sm backdrop-blur">
+          <h1 className="text-lg font-semibold">Acesso negado</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Somente usuários com role PRO podem acessar esta tela.
+          </p>
         </div>
-
-        <button onClick={fetchExercises} style={styles.smallBtn} disabled={loading}>
-          {loading ? "Atualizando..." : "Atualizar exercícios"}
-        </button>
       </div>
+    );
+  }
 
-      <div style={styles.grid}>
-        {/* Left: selecionar exercício */}
-        <div style={styles.panel}>
-          <div style={styles.panelHeader}>
+  return (
+    <div className="min-h-screen bg-[image:var(--gradient-bg)] px-4 py-6 sm:py-8">
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+        {/* Header */}
+        <section className="rounded-2xl border border-border/60 bg-card/80 p-5 shadow-sm backdrop-blur">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <div style={styles.panelTitle}>1) Escolher exercício</div>
-              <div style={styles.panelSubtitle}>Selecione um exercício do catálogo.</div>
+              <Link
+                to={`/patients/${patientId}`}
+                className="inline-flex items-center gap-2 text-xs font-medium text-primary hover:opacity-80 transition"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar para o paciente
+              </Link>
+
+              <h1 className="mt-2 text-lg font-semibold tracking-tight">Prescrever exercício</h1>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Paciente: {patient ? `${patient.name} • ${patient.email}` : "Carregando..."}
+              </p>
             </div>
+
+            <button
+              onClick={fetchExercises}
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm hover:bg-muted/50 transition"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {loading ? "Atualizando..." : "Atualizar exercícios"}
+            </button>
           </div>
 
-          <div style={{ padding: 16, display: "grid", gap: 10 }}>
-            <input
-              style={styles.search}
-              placeholder="Buscar exercício por título/descrição/id..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
+          {error && (
+            <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+              {error}
+            </div>
+          )}
 
-            {loading ? (
-              <div style={{ color: "#64748b" }}>Carregando...</div>
-            ) : filteredExercises.length === 0 ? (
-              <div style={{ color: "#64748b" }}>Nenhum exercício encontrado.</div>
-            ) : (
-              <div style={styles.exerciseList}>
-                {filteredExercises.map((ex) => {
-                  const selected = ex.id === selectedExerciseId;
-                  return (
-                    <button
-                      key={ex.id}
-                      onClick={() => setSelectedExerciseId(ex.id)}
-                      style={{
-                        ...styles.exerciseRow,
-                        borderColor: selected ? "#0ea5e9" : "#eef2f7",
-                        background: selected ? "#f0f9ff" : "white",
-                      }}
-                    >
-                      <div>
-                        <div style={styles.exerciseTitle}>{ex.title}</div>
-                        <div style={styles.exerciseMeta}>
-                          id={ex.id}
-                          {ex.body_focus ? ` • ${ex.body_focus}` : ""}
-                          {ex.analysis_kind ? ` • ${ex.analysis_kind}` : ""}
+          {success && (
+            <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-600">
+              <div className="font-medium">{success}</div>
+              <button
+                onClick={() => nav(`/patients/${patientId}`)}
+                className="mt-3 inline-flex items-center justify-center rounded-xl border px-4 py-2 text-xs hover:bg-muted/50 transition"
+              >
+                Voltar para o paciente
+              </button>
+            </div>
+          )}
+        </section>
+
+        {/* Content */}
+        <section className="grid gap-4 lg:grid-cols-[1.2fr,1fr]">
+          {/* Left: selecionar exercício */}
+          <div className="rounded-2xl border border-border/60 bg-card/80 shadow-sm backdrop-blur overflow-hidden">
+            <div className="px-5 py-4 border-b border-border/60">
+              <h2 className="text-sm font-semibold tracking-tight">1 - Escolher exercício</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Selecione um exercício do catálogo.</p>
+            </div>
+
+            <div className="p-4 grid gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Buscar por título/descrição/id..."
+                  className="w-full rounded-xl border border-border bg-background px-9 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring)/0.35)]"
+                />
+              </div>
+
+              {loading ? (
+                <div className="p-3 text-sm text-muted-foreground">Carregando...</div>
+              ) : filteredExercises.length === 0 ? (
+                <div className="p-3 text-sm text-muted-foreground">Nenhum exercício encontrado.</div>
+              ) : (
+                <div className="grid gap-3 max-h-[520px] overflow-auto pr-1">
+                  {filteredExercises.map((ex) => {
+                    const selected = ex.id === selectedExerciseId;
+                    return (
+                      <button
+                        key={ex.id}
+                        onClick={() => setSelectedExerciseId(ex.id)}
+                        className={
+                          "w-full rounded-2xl border px-4 py-3 text-left transition " +
+                          (selected
+                            ? "border-primary bg-primary/5"
+                            : "border-border/60 bg-background/60 hover:bg-background/80")
+                        }
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">{ex.title}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              id={ex.id}
+                              {ex.body_focus ? ` • ${ex.body_focus}` : ""}
+                              {ex.analysis_kind ? ` • ${ex.analysis_kind}` : ""}
+                            </p>
+                          </div>
+
+                          <span
+                            className={
+                              "rounded-full px-3 py-1 text-xs font-medium " +
+                              (selected ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")
+                            }
+                          >
+                            {selected ? "Selecionado" : "Selecionar"}
+                          </span>
                         </div>
-                      </div>
-                      <span style={{ fontWeight: 900, color: selected ? "#0ea5e9" : "#94a3b8" }}>
-                        {selected ? "Selecionado" : "Selecionar"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right: params + schedule */}
-        <div style={styles.panel}>
-          <div style={styles.panelHeader}>
-            <div>
-              <div style={styles.panelTitle}>2) Configurar & criar</div>
-              <div style={styles.panelSubtitle}>Defina params, frequência e status.</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
-          <div style={{ padding: 16, display: "grid", gap: 12 }}>
-            <div style={styles.selectedBox}>
-              <div style={styles.selectedLabel}>Exercício selecionado</div>
-              <div style={styles.selectedValue}>
-                {selectedExercise ? `${selectedExercise.title} (id=${selectedExercise.id})` : "—"}
+          {/* Right: params + schedule */}
+          <div className="rounded-2xl border border-border/60 bg-card/80 shadow-sm backdrop-blur overflow-hidden">
+            <div className="px-5 py-4 border-b border-border/60">
+              <h2 className="text-sm font-semibold tracking-tight">2 - Configurar & criar</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Defina parâmetros e ative a prescrição.</p>
+            </div>
+
+            <div className="p-4 grid gap-4">
+              <div className="rounded-xl border border-border/60 bg-background/60 p-3">
+                <p className="text-xs text-muted-foreground">Exercício selecionado</p>
+                <p className="mt-1 text-sm font-semibold">
+                  {selectedExercise ? `${selectedExercise.title}` : "—"}
+                </p>
               </div>
-            </div>
 
-            <label style={styles.label}>
-              Parâmetros (JSON)
-              <textarea
-                style={styles.textarea}
-                value={paramsText}
-                onChange={(e) => setParamsText(e.target.value)}
-                spellCheck={false}
-              />
-            </label>
+              <div className="grid gap-1.5">
+                <label className="text-sm font-medium">Parâmetros (JSON)</label>
+                <textarea
+                  value={paramsText}
+                  onChange={(e) => setParamsText(e.target.value)}
+                  spellCheck={false}
+                  className="min-h-[220px] w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-[hsl(var(--ring)/0.35)]"
+                />
+                <p className="text-xs text-muted-foreground">
+                  MVP: params é JSON livre. Depois a gente guia por <code>analysis_kind</code>.
+                </p>
+              </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <label style={styles.label}>
-                Frequência
-                <select style={styles.input} value={schedule} onChange={(e) => setSchedule(e.target.value as any)}>
-                  <option value="DAILY">Diário</option>
-                  <option value="WEEKLY">Semanal</option>
-                  <option value="MONTHLY">Mensal</option>
-                </select>
-              </label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <label className="text-sm font-medium">Frequência</label>
+                  <select
+                    value={schedule}
+                    onChange={(e) => setSchedule(e.target.value as any)}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring)/0.35)]"
+                  >
+                    <option value="DAILY">Diário</option>
+                    <option value="WEEKLY">Semanal</option>
+                    <option value="MONTHLY">Mensal</option>
+                  </select>
+                </div>
 
-              <label style={styles.label}>
-                Ativo
-                <select
-                  style={styles.input}
-                  value={active ? "true" : "false"}
-                  onChange={(e) => setActive(e.target.value === "true")}
-                >
-                  <option value="true">true</option>
-                  <option value="false">false</option>
-                </select>
-              </label>
-            </div>
-
-            {error && <div style={styles.errorBox}>{error}</div>}
-            {success && (
-              <div style={styles.successBox}>
-                {success}
-                <div style={{ marginTop: 8 }}>
-                  <button onClick={() => nav(`/patients/${patientId}`)} style={styles.smallBtn}>
-                    Voltar para o paciente
-                  </button>
+                <div className="grid gap-1.5">
+                  <label className="text-sm font-medium">Ativo</label>
+                  <select
+                    value={active ? "true" : "false"}
+                    onChange={(e) => setActive(e.target.value === "true")}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring)/0.35)]"
+                  >
+                    <option value="true">Verdadeiro</option>
+                    <option value="false">Falso</option>
+                  </select>
                 </div>
               </div>
-            )}
 
-            <button onClick={onSubmit} style={styles.primaryBtn} disabled={saving}>
-              {saving ? "Criando..." : "Criar prescrição"}
-            </button>
-
-            <div style={{ fontSize: 12, color: "#64748b" }}>
-              MVP: params é um JSON livre. Depois a gente troca por campos guiados por <code>analysis_kind</code>.
+              <button
+                onClick={onSubmit}
+                disabled={saving}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground shadow-button hover:opacity-90 transition disabled:opacity-60"
+              >
+                <Sparkles className="h-4 w-4" />
+                {saving ? "Criando..." : "Criar prescrição"}
+              </button>
             </div>
           </div>
-        </div>
-      </div>
+        </section>
+      </main>
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  page: { minHeight: "100vh", background: "#f3f6fb", padding: 22 },
-  header: {
-    background: "white",
-    borderRadius: 16,
-    padding: 16,
-    border: "1px solid #eef2f7",
-    boxShadow: "0 10px 22px rgba(15, 23, 42, 0.06)",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  backLink: { color: "#0ea5e9", fontWeight: 900, textDecoration: "none", fontSize: 13 },
-  title: { marginTop: 8, fontSize: 16, fontWeight: 900, color: "#0f172a" },
-  subtitle: { marginTop: 4, fontSize: 12, color: "#64748b" },
-
-  grid: {
-    marginTop: 16,
-    display: "grid",
-    gridTemplateColumns: "1.2fr 1fr",
-    gap: 16,
-  },
-
-  panel: {
-    background: "white",
-    borderRadius: 16,
-    border: "1px solid #eef2f7",
-    boxShadow: "0 10px 22px rgba(15, 23, 42, 0.06)",
-    overflow: "hidden",
-  },
-  panelHeader: {
-    padding: 16,
-    borderBottom: "1px solid #eef2f7",
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 12,
-    alignItems: "flex-start",
-  },
-  panelTitle: { fontSize: 14, fontWeight: 900, color: "#0f172a" },
-  panelSubtitle: { fontSize: 12, color: "#64748b", marginTop: 4 },
-
-  search: {
-    height: 40,
-    borderRadius: 12,
-    border: "1px solid #e2e8f0",
-    padding: "0 12px",
-    outline: "none",
-    background: "white",
-  },
-
-  exerciseList: {
-    display: "grid",
-    gap: 10,
-    maxHeight: 520,
-    overflow: "auto",
-    paddingRight: 4,
-  },
-  exerciseRow: {
-    border: "1px solid #eef2f7",
-    borderRadius: 14,
-    padding: 12,
-    cursor: "pointer",
-    background: "white",
-    textAlign: "left",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-  },
-  exerciseTitle: { fontWeight: 900, color: "#0f172a" },
-  exerciseMeta: { marginTop: 4, fontSize: 12, color: "#64748b" },
-
-  selectedBox: {
-    border: "1px solid #eef2f7",
-    borderRadius: 14,
-    padding: 12,
-    background: "#f8fafc",
-  },
-  selectedLabel: { fontSize: 12, color: "#64748b", fontWeight: 800 },
-  selectedValue: { marginTop: 6, fontWeight: 900, color: "#0f172a" },
-
-  label: { display: "grid", gap: 6, fontSize: 13, color: "#0f172a", fontWeight: 800 },
-  input: {
-    height: 40,
-    borderRadius: 12,
-    border: "1px solid #e2e8f0",
-    padding: "0 12px",
-    outline: "none",
-    background: "white",
-    fontWeight: 800,
-  },
-  textarea: {
-    minHeight: 220,
-    borderRadius: 12,
-    border: "1px solid #e2e8f0",
-    padding: 12,
-    outline: "none",
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-    fontSize: 12,
-  },
-
-  smallBtn: {
-    height: 36,
-    borderRadius: 10,
-    border: "1px solid #e2e8f0",
-    background: "white",
-    padding: "0 12px",
-    cursor: "pointer",
-    fontWeight: 700,
-  },
-  primaryBtn: {
-    height: 40,
-    borderRadius: 12,
-    border: "none",
-    background: "#0ea5e9",
-    color: "white",
-    padding: "0 14px",
-    cursor: "pointer",
-    fontWeight: 900,
-  },
-
-  errorBox: {
-    padding: 12,
-    borderRadius: 12,
-    background: "#ffe8e8",
-    color: "#9b1c1c",
-    fontSize: 13,
-  },
-  successBox: {
-    padding: 12,
-    borderRadius: 12,
-    background: "#dcfce7",
-    color: "#166534",
-    fontSize: 13,
-    fontWeight: 800,
-  },
-};

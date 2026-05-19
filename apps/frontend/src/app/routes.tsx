@@ -12,6 +12,8 @@ import MyPatientsPage from "../pages/MyPatientsPage";
 import PatientDetailsPage from "../pages/PatientDetailsPage";
 import PrescribeExercisePage from "../pages/PrescribeExercisePage";
 import PatientAssignmentsPage from "../pages/PatientAssignmentsPage";
+import MySessionsPage from "../pages/MySessionsPage";
+import SessionRunPage from "../pages/SessionRunPage";
 import UserSessionPage from "../pages/UserSessionPage";
 
 export default function AppRoutes() {
@@ -30,7 +32,7 @@ export default function AppRoutes() {
       />
 
       <Route
-        path="/dashboard"
+        path="/pro/dashboard"
         element={
           <ProtectedRoute>
             <ProDashboard />
@@ -39,7 +41,7 @@ export default function AppRoutes() {
       />
 
       <Route
-        path="/dashboard-x"
+        path="/dashboard"
         element={
           <ProtectedRoute>
             <UserDashboard />
@@ -106,6 +108,24 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <UserSessionPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/sessions"
+        element={
+          <ProtectedRoute>
+            <MySessionsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/sessions/:id"
+        element={
+          <ProtectedRoute>
+            <SessionRunPage />
           </ProtectedRoute>
         }
       />

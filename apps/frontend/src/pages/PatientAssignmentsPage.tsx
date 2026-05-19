@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-import { apiFetch } from "../lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api";
+import { ArrowLeft, ClipboardList, RefreshCw } from "lucide-react";
 
 type Exercise = {
   id: number;
@@ -48,6 +49,8 @@ export default function PatientAssignmentsPage() {
       setExerciseMap(map);
     } catch (err: any) {
       setError(err?.message || "Erro ao carregar prescrições.");
+      setAssignments([]);
+      setExerciseMap({});
     } finally {
       setLoading(false);
     }
@@ -71,145 +74,112 @@ export default function PatientAssignmentsPage() {
 
   if (!isPro) {
     return (
-      <div style={{ padding: 24 }}>
-        <h2>Acesso negado</h2>
-        <p>Somente usuários com role PRO podem acessar esta tela.</p>
+      <div className="min-h-screen bg-[image:var(--gradient-bg)] px-4 py-6 sm:py-8">
+        <div className="mx-auto max-w-3xl rounded-2xl border border-border/60 bg-card/80 p-6 shadow-sm backdrop-blur">
+          <h1 className="text-lg font-semibold">Acesso negado</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Somente usuários com role PRO podem acessar esta tela.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={styles.page}>
-      <div style={styles.header}>
-        <div>
-          <Link to={`/patients/${patientId}`} style={styles.backLink}>
-            ← Voltar
-          </Link>
-          <div style={styles.title}>Prescrições do paciente</div>
-          <div style={styles.subtitle}>Paciente: {patientId}</div>
-        </div>
+    <div className="min-h-screen bg-[image:var(--gradient-bg)] px-4 py-6 sm:py-8">
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+        {/* Header */}
+        <section className="rounded-2xl border border-border/60 bg-card/80 p-5 shadow-sm backdrop-blur">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <Link
+                to={`/patients/${patientId}`}
+                className="inline-flex items-center gap-2 text-xs font-medium text-primary hover:opacity-80 transition"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar para o paciente
+              </Link>
+              <h1 className="mt-2 text-lg font-semibold tracking-tight">Prescrições</h1>
+              <p className="mt-1 text-xs text-muted-foreground break-all">Paciente: {patientId}</p>
+            </div>
 
-        <button onClick={fetchAll} style={styles.smallBtn} disabled={loading}>
-          {loading ? "Atualizando..." : "Atualizar"}
-        </button>
-      </div>
-
-      {error && <div style={styles.errorBox}>{error}</div>}
-
-      <div style={styles.panel}>
-        <div style={styles.panelHeader}>
-          <div style={styles.panelTitle}>Assignments</div>
-          <div style={styles.panelSubtitle}>{loading ? "…" : `${sorted.length} item(s)`}</div>
-        </div>
-
-        {loading ? (
-          <div style={{ padding: 16 }}>Carregando...</div>
-        ) : sorted.length === 0 ? (
-          <div style={{ padding: 16, color: "#6b7280" }}>Nenhuma prescrição encontrada.</div>
-        ) : (
-          <div style={{ padding: 10 }}>
-            {sorted.map((a) => {
-              const ex = exerciseMap[a.exercise_id];
-              const title = ex?.title || `Exercício #${a.exercise_id}`;
-              return (
-                <div key={a.id} style={styles.row}>
-                  <div>
-                    <div style={styles.rowTitle}>{title}</div>
-                    <div style={styles.rowSub}>
-                      schedule: {a.schedule} • active: {String(a.active)} • config: #{a.config_id}
-                      {ex?.analysis_kind ? ` • ${ex.analysis_kind}` : ""}
-                      {ex?.body_focus ? ` • ${ex.body_focus}` : ""}
-                    </div>
-                  </div>
-                  <span style={a.active ? styles.badgeOn : styles.badgeOff}>
-                    {a.active ? "Ativo" : "Inativo"}
-                  </span>
-                </div>
-              );
-            })}
+            <button
+              onClick={fetchAll}
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm hover:bg-muted/50 transition"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {loading ? "Atualizando..." : "Atualizar"}
+            </button>
           </div>
-        )}
-      </div>
 
-      <div style={{ marginTop: 12, color: "#64748b", fontSize: 12 }}>
-        Próximo upgrade: botões “Desativar/Ativar” e “Editar schedule”, se você tiver endpoints de update.
-      </div>
+          {error && (
+            <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+              {error}
+            </div>
+          )}
+        </section>
+
+        {/* List */}
+        <section className="rounded-2xl border border-border/60 bg-card/80 shadow-sm backdrop-blur overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold tracking-tight">Assignments</h2>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {loading ? "…" : `${sorted.length} item(s)`}
+            </span>
+          </div>
+
+          <div className="p-3">
+            {loading ? (
+              <div className="p-4 text-sm text-muted-foreground">Carregando...</div>
+            ) : sorted.length === 0 ? (
+              <div className="p-4 text-sm text-muted-foreground">Nenhuma prescrição encontrada.</div>
+            ) : (
+              <div className="grid gap-3">
+                {sorted.map((a) => {
+                  const ex = exerciseMap[a.exercise_id];
+                  const title = ex?.title || `Exercício #${a.exercise_id}`;
+                  return (
+                    <div
+                      key={a.id}
+                      className="rounded-2xl border border-border/60 bg-background/60 px-4 py-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{title}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            freq: {a.schedule} • config #{a.config_id}
+                            {ex?.analysis_kind ? ` • ${ex.analysis_kind}` : ""}
+                            {ex?.body_focus ? ` • ${ex.body_focus}` : ""}
+                          </p>
+                        </div>
+
+                        <span
+                          className={
+                            "shrink-0 rounded-full px-3 py-1 text-xs font-medium " +
+                            (a.active
+                              ? "bg-emerald-500/10 text-emerald-500"
+                              : "bg-rose-500/10 text-rose-500")
+                          }
+                        >
+                          {a.active ? "Ativo" : "Inativo"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="px-5 py-4 border-t border-border/60 text-xs text-muted-foreground">
+            Próximo upgrade: botões “Ativar/Desativar” e “Editar frequência”, se você tiver endpoints de update.
+          </div>
+        </section>
+      </main>
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  page: { minHeight: "100vh", background: "#f3f6fb", padding: 22 },
-  header: {
-    background: "white",
-    borderRadius: 16,
-    padding: 16,
-    border: "1px solid #eef2f7",
-    boxShadow: "0 10px 22px rgba(15, 23, 42, 0.06)",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  backLink: { color: "#0ea5e9", fontWeight: 900, textDecoration: "none", fontSize: 13 },
-  title: { marginTop: 8, fontSize: 16, fontWeight: 900, color: "#0f172a" },
-  subtitle: { marginTop: 4, fontSize: 12, color: "#64748b" },
-  smallBtn: {
-    height: 36,
-    borderRadius: 10,
-    border: "1px solid #e2e8f0",
-    background: "white",
-    padding: "0 12px",
-    cursor: "pointer",
-    fontWeight: 700,
-  },
-  errorBox: {
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 12,
-    background: "#ffe8e8",
-    color: "#9b1c1c",
-    fontSize: 13,
-  },
-  panel: {
-    marginTop: 14,
-    background: "white",
-    borderRadius: 16,
-    border: "1px solid #eef2f7",
-    boxShadow: "0 10px 22px rgba(15, 23, 42, 0.06)",
-    overflow: "hidden",
-  },
-  panelHeader: { padding: 16, borderBottom: "1px solid #eef2f7" },
-  panelTitle: { fontSize: 14, fontWeight: 900, color: "#0f172a" },
-  panelSubtitle: { marginTop: 4, fontSize: 12, color: "#64748b" },
-  row: {
-    padding: 12,
-    margin: 6,
-    borderRadius: 14,
-    border: "1px solid #eef2f7",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-  },
-  rowTitle: { fontWeight: 900, color: "#0f172a" },
-  rowSub: { marginTop: 4, fontSize: 12, color: "#64748b" },
-  badgeOn: {
-    fontSize: 12,
-    padding: "6px 10px",
-    borderRadius: 999,
-    background: "#dcfce7",
-    color: "#166534",
-    fontWeight: 900,
-    whiteSpace: "nowrap",
-  },
-  badgeOff: {
-    fontSize: 12,
-    padding: "6px 10px",
-    borderRadius: 999,
-    background: "#fee2e2",
-    color: "#991b1b",
-    fontWeight: 900,
-    whiteSpace: "nowrap",
-  },
-};

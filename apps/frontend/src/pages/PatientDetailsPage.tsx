@@ -1,59 +1,56 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-import { apiFetch } from "../lib/api";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api";
+import { ArrowLeft, Calendar, ClipboardList, RefreshCw, Sparkles } from "lucide-react";
 
 type Patient = {
   id: string;
   name: string;
   email: string;
-  role?: string;
 };
 
 type Assignment = {
-  id: string;
-  patient_user_id?: string;
+  id: number | string;
   exercise_id?: number;
-  config_id?: string;
   status?: string;
   created_at?: string;
 };
 
 type Session = {
   id: string;
-  patient_user_id?: string;
-  assignment_id?: string;
-  started_at?: string;
-  ended_at?: string;
-  created_at?: string;
+  exercise_id?: number;
+  assignment_id?: number;
   status?: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  created_at?: string;
 };
 
 type Exercise = {
   id: number;
   title: string;
   analysis_kind?: string;
-  body_docus?: string;
+  body_focus?: string;
 };
 
 export default function PatientDetailsPage() {
   const { isPro } = useAuth();
   const { id } = useParams<{ id: string }>();
+  const nav = useNavigate();
+
+  const patientId = id || "";
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [exerciseMap, setExerciseMap] = useState<Record<number, Exercise>>({});
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const patientId = id || "";
-
-  const [exerciseMap, setExerciseMap] = useState<Record<number, Exercise>>({});
-
   const fetchAll = async () => {
     if (!patientId) return;
-
     setLoading(true);
     setError(null);
 
@@ -85,11 +82,7 @@ export default function PatientDetailsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPro, patientId]);
 
-  const assignmentsCount = assignments.length;
-  const sessionsCount = sessions.length;
-
   const recentAssignments = useMemo(() => {
-    // sem saber o schema exato: mostra os primeiros 5
     return [...assignments].slice(0, 5);
   }, [assignments]);
 
@@ -99,272 +92,194 @@ export default function PatientDetailsPage() {
 
   if (!isPro) {
     return (
-      <div style={{ padding: 24 }}>
-        <h2>Acesso negado</h2>
-        <p>Somente usuários com role PRO podem acessar esta tela.</p>
+      <div className="min-h-screen bg-[image:var(--gradient-bg)] px-4 py-6 sm:py-8">
+        <div className="mx-auto max-w-3xl rounded-2xl border border-border/60 bg-card/80 p-6 shadow-sm backdrop-blur">
+          <h1 className="text-lg font-semibold">Acesso negado</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Somente usuários com role PRO podem acessar esta tela.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={styles.page}>
-      <div style={styles.header}>
-        <div>
-          <Link to="/patients" style={styles.backLink}>← Voltar</Link>
-          <div style={styles.title}>Paciente</div>
-          <div style={styles.subtitle}>
-            {patient ? `${patient.name} • ${patient.email}` : "Carregando..."}
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={fetchAll} style={styles.smallBtn} disabled={loading}>
-            {loading ? "Atualizando..." : "Atualizar"}
-          </button>
-
-          {/* Próximo passo: rota do wizard de prescrição */}
-          <Link to={`/patients/${patientId}/prescribe`} style={{ textDecoration: "none" }}>
-            <div style={styles.primaryBtn as React.CSSProperties}>Prescrever exercício</div>
-          </Link>
-        </div>
-      </div>
-
-      <div style={styles.cards}>
-        <StatCard label="Prescrições" value={assignmentsCount} icon="📌" />
-        <StatCard label="Sessões" value={sessionsCount} icon="🗓️" />
-        <StatCard label="Resultados" value={"—"} icon="📈" helper="(em breve)" />
-      </div>
-
-      {error && <div style={styles.errorBox}>{error}</div>}
-
-      <div style={styles.grid}>
-        <div style={styles.panel}>
-          <div style={styles.panelHeader}>
+    <div className="min-h-screen bg-[image:var(--gradient-bg)] px-4 py-6 sm:py-8">
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+        {/* Header */}
+        <section className="rounded-2xl border border-border/60 bg-card/80 p-5 shadow-sm backdrop-blur">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <div style={styles.panelTitle}>Prescrições (assignments)</div>
-              <div style={styles.panelSubtitle}>Vínculos de exercícios atribuídos ao paciente.</div>
+              <Link
+                to="/patients"
+                className="inline-flex items-center gap-2 text-xs font-medium text-primary hover:opacity-80 transition"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar para pacientes
+              </Link>
+
+              <h1 className="mt-2 text-lg font-semibold tracking-tight">Paciente</h1>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {patient ? `${patient.name} • ${patient.email}` : "Carregando..."}
+              </p>
             </div>
-            <Link to={`/patients/${patientId}/assignments`} style={styles.link}>
-              Ver todos
-            </Link>
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={fetchAll}
+                disabled={loading}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm hover:bg-muted/50 transition"
+              >
+                <RefreshCw className="h-4 w-4" />
+                {loading ? "Atualizando..." : "Atualizar"}
+              </button>
+
+              <button
+                onClick={() => nav(`/patients/${patientId}/prescribe`)}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground shadow-button hover:opacity-90 transition"
+              >
+                <Sparkles className="h-4 w-4" />
+                Prescrever exercício
+              </button>
+            </div>
           </div>
 
-          {loading ? (
-            <div style={{ padding: 16 }}>Carregando...</div>
-          ) : recentAssignments.length === 0 ? (
-            <div style={{ padding: 16, color: "#6b7280" }}>Nenhuma prescrição ainda.</div>
-          ) : (
-            <div style={styles.list}>
-              {recentAssignments.map((a) => (
-                <div key={a.id} style={styles.listItem}>
-                  <div>
-                    <div style={styles.itemTitle}>Assignment {a.id}</div>
-                    <div style={styles.itemSubtitle}>
-                      {a.status ? `Status: ${a.status}` : "Status: —"}
-                      {a.exercise_id != null
-                        ? ` • Exercício: ${exerciseMap[a.exercise_id]?.title || `#${a.exercise_id}`}`
-                        : ""}
-                    </div>
-                  </div>
-                  <span style={styles.badge}>OK</span>
-                </div>
-              ))}
+          {error && (
+            <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+              {error}
             </div>
           )}
-        </div>
+        </section>
 
-        <div style={styles.panel}>
-          <div style={styles.panelHeader}>
-            <div>
-              <div style={styles.panelTitle}>Sessões</div>
-              <div style={styles.panelSubtitle}>Sessões associadas ao paciente.</div>
+        {/* Cards */}
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Prescrições</span>
+              <ClipboardList className="h-4 w-4 text-primary" />
             </div>
-            <Link to={`/patients/${patientId}/sessions`} style={styles.link}>
-              Ver todas
-            </Link>
+            <p className="mt-3 text-3xl font-semibold tracking-tight">{loading ? "…" : assignments.length}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Total atribuídas</p>
           </div>
 
-          {loading ? (
-            <div style={{ padding: 16 }}>Carregando...</div>
-          ) : recentSessions.length === 0 ? (
-            <div style={{ padding: 16, color: "#6b7280" }}>Nenhuma sessão ainda.</div>
-          ) : (
-            <div style={styles.list}>
-              {recentSessions.map((s) => (
-                <div key={s.id} style={styles.listItem}>
-                  <div>
-                    <div style={styles.itemTitle}>Sessão {s.id}</div>
-                    <div style={styles.itemSubtitle}>
-                      {s.status ? `Status: ${s.status}` : "Status: —"}
-                      {s.created_at ? ` • Criada: ${formatDate(s.created_at)}` : ""}
-                    </div>
-                  </div>
-                  <span style={styles.badgeBlue}>Abrir</span>
-                </div>
-              ))}
+          <div className="rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Sessões</span>
+              <Calendar className="h-4 w-4 text-primary" />
             </div>
-          )}
-        </div>
-      </div>
+            <p className="mt-3 text-3xl font-semibold tracking-tight">{loading ? "…" : sessions.length}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Total registradas</p>
+          </div>
 
-      {/* Loading skeleton simples */}
-      {loading && !patient && <div style={{ padding: 16, color: "#64748b" }}>Carregando dados…</div>}
-    </div>
-  );
-}
+          <div className="rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Resultados</span>
+              <span className="text-primary text-sm font-semibold">Em breve</span>
+            </div>
+            <p className="mt-3 text-3xl font-semibold tracking-tight">—</p>
+            <p className="mt-1 text-xs text-muted-foreground">Quando o backend estabilizar métricas</p>
+          </div>
+        </section>
 
-function StatCard({
-  label,
-  value,
-  icon,
-  helper,
-}: {
-  label: string;
-  value: number | string;
-  icon: string;
-  helper?: string;
-}) {
-  return (
-    <div style={styles.card}>
-      <div style={styles.cardTop}>
-        <div style={styles.cardLabel}>{label}</div>
-        <div style={styles.cardIcon}>{icon}</div>
-      </div>
-      <div style={styles.cardValue}>{value}</div>
-      {helper && <div style={styles.cardHelper}>{helper}</div>}
+        {/* Panels */}
+        <section className="grid gap-4 lg:grid-cols-2">
+          {/* Prescrições */}
+          <div className="rounded-2xl border border-border/60 bg-card/80 shadow-sm backdrop-blur overflow-hidden">
+            <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border/60">
+              <div>
+                <h2 className="text-sm font-semibold tracking-tight">Prescrições</h2>
+                <p className="mt-1 text-xs text-muted-foreground">Exercícios atribuídos ao paciente.</p>
+              </div>
+
+              <Link to={`/patients/${patientId}/assignments`} className="text-xs font-medium text-primary hover:opacity-80">
+                Ver todas
+              </Link>
+            </div>
+
+            <div className="p-3">
+              {loading ? (
+                <div className="p-4 text-sm text-muted-foreground">Carregando…</div>
+              ) : recentAssignments.length === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground">Nenhuma prescrição ainda.</div>
+              ) : (
+                <div className="grid gap-3">
+                  {recentAssignments.map((a) => {
+                    const exTitle =
+                      a.exercise_id != null ? (exerciseMap[a.exercise_id]?.title || `Exercício #${a.exercise_id}`) : "—";
+                    return (
+                      <div
+                        key={String(a.id)}
+                        className="rounded-2xl border border-border/60 bg-background/60 px-4 py-3"
+                      >
+                        <p className="text-sm font-semibold">{exTitle}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {a.status ? `Status: ${a.status}` : "Status: —"}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Sessões */}
+          <div className="rounded-2xl border border-border/60 bg-card/80 shadow-sm backdrop-blur overflow-hidden">
+            <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border/60">
+              <div>
+                <h2 className="text-sm font-semibold tracking-tight">Sessões</h2>
+                <p className="mt-1 text-xs text-muted-foreground">Sessões registradas do paciente.</p>
+              </div>
+
+              {/* Você ainda não tem rota de lista completa de sessões por paciente, então fica em breve */}
+              <span className="text-xs text-muted-foreground">Em breve</span>
+            </div>
+
+            <div className="p-3">
+              {loading ? (
+                <div className="p-4 text-sm text-muted-foreground">Carregando…</div>
+              ) : recentSessions.length === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground">Nenhuma sessão ainda.</div>
+              ) : (
+                <div className="grid gap-3">
+                  {recentSessions.map((s) => {
+                    const exTitle =
+                      s.exercise_id != null ? (exerciseMap[s.exercise_id]?.title || `Exercício #${s.exercise_id}`) : "—";
+                    return (
+                      <div
+                        key={s.id}
+                        className="rounded-2xl border border-border/60 bg-background/60 px-4 py-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">{exTitle}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {s.status ? `Status: ${s.status}` : "Status: —"}
+                              {s.created_at ? ` • Criada: ${formatDate(s.created_at)}` : ""}
+                            </p>
+                          </div>
+
+                          <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                            {s.status || "—"}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
   );
 }
 
 function formatDate(iso: string) {
   try {
-    const d = new Date(iso);
-    return d.toLocaleString();
+    return new Date(iso).toLocaleString();
   } catch {
     return iso;
   }
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  page: { minHeight: "100vh", background: "#f3f6fb", padding: 22 },
-  header: {
-    background: "white",
-    borderRadius: 16,
-    padding: 16,
-    border: "1px solid #eef2f7",
-    boxShadow: "0 10px 22px rgba(15, 23, 42, 0.06)",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  backLink: { color: "#0ea5e9", fontWeight: 900, textDecoration: "none", fontSize: 13 },
-  title: { marginTop: 8, fontSize: 16, fontWeight: 900, color: "#0f172a" },
-  subtitle: { marginTop: 4, fontSize: 12, color: "#64748b" },
-
-  cards: {
-    marginTop: 14,
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: 16,
-  },
-  card: {
-    background: "white",
-    borderRadius: 16,
-    padding: 16,
-    border: "1px solid #eef2f7",
-    boxShadow: "0 10px 22px rgba(15, 23, 42, 0.06)",
-    minHeight: 92,
-  },
-  cardTop: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  cardLabel: { fontSize: 13, color: "#64748b", fontWeight: 800 },
-  cardIcon: { fontSize: 16, opacity: 0.9 },
-  cardValue: { marginTop: 10, fontSize: 30, fontWeight: 900, color: "#0f172a" },
-  cardHelper: { marginTop: 6, fontSize: 12, color: "#94a3b8" },
-
-  grid: {
-    marginTop: 16,
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 16,
-  },
-  panel: {
-    background: "white",
-    borderRadius: 16,
-    border: "1px solid #eef2f7",
-    boxShadow: "0 10px 22px rgba(15, 23, 42, 0.06)",
-    overflow: "hidden",
-  },
-  panelHeader: {
-    padding: 16,
-    borderBottom: "1px solid #eef2f7",
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 12,
-    alignItems: "flex-start",
-  },
-  panelTitle: { fontSize: 14, fontWeight: 900, color: "#0f172a" },
-  panelSubtitle: { fontSize: 12, color: "#64748b", marginTop: 4 },
-
-  list: { padding: 10 },
-  listItem: {
-    padding: 12,
-    margin: 6,
-    borderRadius: 14,
-    border: "1px solid #eef2f7",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  itemTitle: { fontWeight: 900, color: "#0f172a" },
-  itemSubtitle: { fontSize: 12, color: "#64748b", marginTop: 4 },
-  badge: {
-    fontSize: 12,
-    padding: "6px 10px",
-    borderRadius: 999,
-    background: "#dcfce7",
-    color: "#166534",
-    fontWeight: 900,
-  },
-  badgeBlue: {
-    fontSize: 12,
-    padding: "6px 10px",
-    borderRadius: 999,
-    background: "#dbeafe",
-    color: "#1d4ed8",
-    fontWeight: 900,
-  },
-
-  smallBtn: {
-    height: 36,
-    borderRadius: 10,
-    border: "1px solid #e2e8f0",
-    background: "white",
-    padding: "0 12px",
-    cursor: "pointer",
-    fontWeight: 700,
-  },
-  primaryBtn: {
-    height: 36,
-    borderRadius: 10,
-    border: "none",
-    background: "#0ea5e9",
-    color: "white",
-    padding: "0 12px",
-    cursor: "pointer",
-    fontWeight: 900,
-    display: "grid",
-    placeItems: "center",
-  },
-
-  errorBox: {
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 12,
-    background: "#ffe8e8",
-    color: "#9b1c1c",
-    fontSize: 13,
-  },
-
-  link: { color: "#0ea5e9", fontWeight: 900, textDecoration: "none", fontSize: 13 },
-};

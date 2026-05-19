@@ -5,80 +5,115 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 200 20% 97%;
-    --foreground: 210 40% 14%;
+  @layer base {
+    :root {
+      /* Base */
+      --background: 200 20% 97%;
+      --foreground: 174 7% 20%;
+      /* #444E4D (grafite) */
 
-    --card: 0 0% 100%;
-    --card-foreground: 210 40% 14%;
+      --card: 0 0% 100%;
+      --card-foreground: var(--foreground);
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 210 40% 14%;
+      --popover: 0 0% 100%;
+      --popover-foreground: var(--foreground);
 
-    --primary: 199 89% 48%;
-    --primary-foreground: 0 0% 100%;
+      /* Brand tokens (suas 4 cores) */
+      --brand-teal: 165 35% 56%;
+      /* #67B5A2 */
+      --brand-slate: 174 7% 29%;
+      /* #444E4D */
+      --brand-magenta: 307 60% 43%;
+      /* #B02CA0 */
+      --brand-gold: 47 65% 58%;
+      /* #D9BB4E */
 
-    --secondary: 152 60% 48%;
-    --secondary-foreground: 0 0% 100%;
+      /* Semânticos (shadcn) */
+      --primary: var(--brand-teal);
+      --primary-foreground: 0 0% 100%;
 
-    --muted: 200 18% 93%;
-    --muted-foreground: 210 12% 50%;
+      --secondary: var(--brand-magenta);
+      --secondary-foreground: 0 0% 100%;
 
-    --accent: 152 50% 94%;
-    --accent-foreground: 152 60% 30%;
+      /* Accent: usamos o dourado como acento */
+      --accent: var(--brand-gold);
+      --accent-foreground: 174 7% 18%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+      --muted: 200 18% 93%;
+      --muted-foreground: 174 6% 45%;
 
-    --border: 200 20% 88%;
-    --input: 200 20% 88%;
-    --ring: 199 89% 48%;
+      --destructive: 0 84% 60%;
+      --destructive-foreground: 0 0% 100%;
 
-    --radius: 0.75rem;
+      --border: 200 20% 88%;
+      --input: 200 20% 88%;
+      --ring: var(--brand-teal);
 
-    --gradient-hero: linear-gradient(135deg, hsl(199 89% 48%), hsl(170 60% 45%));
-    --gradient-bg: linear-gradient(160deg, hsl(200 30% 96%), hsl(160 25% 95%) 50%, hsl(200 20% 97%));
-    --shadow-card: 0 4px 24px -4px hsl(199 89% 48% / 0.1), 0 1px 4px hsl(0 0% 0% / 0.04);
-    --shadow-button: 0 4px 14px -3px hsl(199 89% 48% / 0.4);
+      --radius: 0.9rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
+      /* Gradientes / sombras (ajustados ao brand) */
+      --gradient-hero: linear-gradient(135deg, hsl(var(--brand-teal)), hsl(var(--brand-magenta)));
+      --gradient-bg: linear-gradient(160deg, hsl(200 30% 96%), hsl(165 20% 95%) 50%, hsl(200 20% 97%));
 
-  .dark {
-    --background: 210 30% 8%;
-    --foreground: 200 20% 95%;
-    --card: 210 28% 12%;
-    --card-foreground: 200 20% 95%;
-    --popover: 210 28% 12%;
-    --popover-foreground: 200 20% 95%;
-    --primary: 199 89% 52%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 152 55% 42%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 210 25% 18%;
-    --muted-foreground: 200 15% 60%;
-    --accent: 152 40% 18%;
-    --accent-foreground: 152 50% 70%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 210 25% 20%;
-    --input: 210 25% 20%;
-    --ring: 199 89% 52%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+      --shadow-card: 0 6px 26px -6px hsl(var(--brand-teal) / 0.18), 0 2px 6px hsl(0 0% 0% / 0.05);
+      --shadow-button: 0 6px 18px -6px hsl(var(--brand-teal) / 0.45);
+
+      /* Sidebar mantém (pode ajustar depois) */
+      --sidebar-background: 0 0% 98%;
+      --sidebar-foreground: 240 5.3% 26.1%;
+      --sidebar-primary: 240 5.9% 10%;
+      --sidebar-primary-foreground: 0 0% 98%;
+      --sidebar-accent: 240 4.8% 95.9%;
+      --sidebar-accent-foreground: 240 5.9% 10%;
+      --sidebar-border: 220 13% 91%;
+      --sidebar-ring: 217.2 91.2% 59.8%;
+    }
+
+    .dark {
+      --background: 210 30% 8%;
+      --foreground: 200 20% 95%;
+
+      --card: 210 28% 12%;
+      --card-foreground: 200 20% 95%;
+
+      --popover: 210 28% 12%;
+      --popover-foreground: 200 20% 95%;
+
+      /* Brand (mesmos tons, ligeiramente “mais vivos” no dark) */
+      --brand-teal: 165 40% 60%;
+      --brand-slate: 174 7% 80%;
+      --brand-magenta: 307 65% 55%;
+      --brand-gold: 47 70% 58%;
+
+      --primary: var(--brand-teal);
+      --primary-foreground: 0 0% 100%;
+
+      --secondary: var(--brand-magenta);
+      --secondary-foreground: 0 0% 100%;
+
+      --accent: 47 45% 22%;
+      /* dourado “escuro” como background */
+      --accent-foreground: 47 70% 75%;
+
+      --muted: 210 25% 18%;
+      --muted-foreground: 200 15% 65%;
+
+      --destructive: 0 62.8% 30.6%;
+      --destructive-foreground: 210 40% 98%;
+
+      --border: 210 25% 20%;
+      --input: 210 25% 20%;
+      --ring: var(--brand-teal);
+
+      --gradient-bg: linear-gradient(160deg,
+          hsl(210 30% 10%),
+          hsl(210 28% 12%) 50%,
+          hsl(210 30% 8%));
+
+      /* opcional: deixar a sombra mais suave no dark */
+      --shadow-card: 0 6px 26px -10px hsl(0 0% 0% / 0.35), 0 2px 10px hsl(0 0% 0% / 0.25);
+      --shadow-button: 0 10px 20px -10px hsl(var(--primary) / 0.35);
+    }
   }
 }
 
@@ -86,8 +121,23 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Plus Jakarta Sans', sans-serif;
   }
+}
+
+/* Esconde o "olho" nativo (Edge/IE) */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+
+/* Em alguns Chromium/Edge aparece botão de autofill/credenciais */
+input[type="password"]::-webkit-credentials-auto-fill-button,
+input[type="password"]::-webkit-textfield-decoration-container {
+  display: none !important;
+  visibility: hidden;
+  pointer-events: none;
 }
