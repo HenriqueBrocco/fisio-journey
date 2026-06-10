@@ -19,6 +19,15 @@ class ExerciseConfigOut(BaseModel):
     exercise_id: int
     patient_user_id: str
     params: dict
+    num_series: int
+    num_reps: int
+    descanso_rep: int
+    descanso_serie: int
+    lado_ativo: str
+    meta_extensao: int
+    repouso_max: int
+    limite_tronco: int
+    tolerancia: int
     created_at: datetime
 
 

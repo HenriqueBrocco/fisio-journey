@@ -15,8 +15,17 @@ class ExerciseConfig(Base):
 
     # Deixa flexível em JSON pra amputação / futuro:
     params: Mapped[dict] = mapped_column(JSON, default=dict)
-
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    num_series: Mapped[int] = mapped_column(Integer)
+    num_reps: Mapped[int] = mapped_column(Integer)
+    descanso_rep: Mapped[int] = mapped_column(Integer)
+    descanso_serie: Mapped[int] = mapped_column(Integer)
+    lado_ativo: Mapped[str] = mapped_column(String)
+    meta_extensao: Mapped[int] = mapped_column(Integer)
+    repouso_max: Mapped[int] = mapped_column(Integer)
+    limite_tronco: Mapped[int] = mapped_column(Integer)
+    tolerancia: Mapped[int] = mapped_column(Integer)
 
 
 class Assignment(Base):
