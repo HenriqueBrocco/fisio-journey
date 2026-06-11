@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import { apiFetch } from "@/lib/api";
-import CameraStream from "@/components/CameraStream";
-import { ArrowLeft, RefreshCw } from "lucide-react";
 import { MocapCamera } from "@/components/web_game/MocapCamera";
 
 type Session = {
@@ -16,82 +14,59 @@ type Session = {
   finished_at: string | null;
 };
 
-type Summary = {
-  session_id: string;
-  reps: number;
-  rom: number;
-  cadence: number;
-  alerts: string[];
-  created_at: string;
-};
-
-type Exercise = {
-  id: number;
-  title: string;
-  body_focus?: string;
-  analysis_kind?: string;
-};
-
 export default function SessionRunPage() {
   const { id } = useParams<{ id: string }>();
   const sessionId = id || "";
 
   const [session, setSession] = useState<Session | null>(null);
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [exerciseMap, setExerciseMap] = useState<Record<number, Exercise>>({});
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAll = async () => {
-    if (!sessionId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const [s, e] = await Promise.all([
-        apiFetch<Session>(`/v1/sessions/${sessionId}`),
-        apiFetch<Exercise[]>(`/v1/exercises`),
-      ]);
-
-      setSession(s);
-
-      const map: Record<number, Exercise> = {};
-      (Array.isArray(e) ? e : []).forEach((ex) => (map[ex.id] = ex));
-      setExerciseMap(map);
-
-      // tenta summary (pode não existir ainda)
-      try {
-        const sum = await apiFetch<Summary>(`/v1/sessions/${sessionId}/summary`);
-        setSummary(sum);
-      } catch {
-        setSummary(null);
-      }
-    } catch (err: any) {
-      setError(err?.message || "Erro ao carregar sessão.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    async function carregarSessao() {
+      if (!sessionId) {
+        setError("Sessão não informada.");
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const data = await apiFetch<Session>(`/v1/sessions/${sessionId}`);
+        setSession(data);
+      } catch (err: any) {
+        setError(err?.message || "Erro ao carregar sessão.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    carregarSessao();
   }, [sessionId]);
 
-  const exerciseTitle = useMemo(() => {
-    if (!session) return "";
-    return exerciseMap[session.exercise_id]?.title || `Exercício #${session.exercise_id}`;
-  }, [session, exerciseMap]);
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p>Carregando sessão...</p>
+      </div>
+    );
+  }
+
+  if (error || !session) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p>{error || "Sessão não encontrada."}</p>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      {session && (
-        <MocapCamera
-          sessionId={session.id}
-          patientUserId={session.patient_user_id}
-          exerciseId={session.exercise_id}
-        />
-      )}
-    </div>
+    <MocapCamera
+      sessionId={session.id}
+      patientUserId={session.patient_user_id}
+      exerciseId={session.exercise_id}
+    />
   );
 }
