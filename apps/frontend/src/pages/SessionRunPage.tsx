@@ -85,7 +85,13 @@ export default function SessionRunPage() {
 
   return (
     <div>
-      <MocapCamera />
+      {session && (
+        <MocapCamera
+          sessionId={session.id}
+          patientUserId={session.patient_user_id}
+          exerciseId={session.exercise_id}
+        />
+      )}
     </div>
   );
 }
