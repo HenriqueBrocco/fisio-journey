@@ -1,19 +1,11 @@
-"""add exercise config fields
-
-Revision ID: 82a4a2280439
-Revises: b31f8e4a9c12_create_achievements
-Create Date: 2026-06-13 00:02:56.875662
-
-"""
-from typing import Sequence, Union
+"""add exercise config fields"""
 
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
 
-# revision identifiers, used by Alembic.
-revision: str = '82a4a2280439'
+revision = "82a4a2280439"
 down_revision = "b31f8e4a9c12_create_achievements"
 branch_labels = None
 depends_on = None
@@ -37,6 +29,63 @@ def upgrade() -> None:
     add_column_if_missing("repouso_max", sa.Column("repouso_max", sa.Integer(), nullable=True))
     add_column_if_missing("limite_tronco", sa.Column("limite_tronco", sa.Integer(), nullable=True))
     add_column_if_missing("tolerancia", sa.Column("tolerancia", sa.Integer(), nullable=True))
+
+    # garante que colunas numéricas fiquem como INTEGER mesmo se tiverem sido criadas manualmente como texto
+    op.execute("""
+    ALTER TABLE exercise_configs
+    ALTER COLUMN num_series
+    TYPE INTEGER
+    USING NULLIF(TRIM(num_series::text), '')::INTEGER
+    """)
+
+    op.execute("""
+    ALTER TABLE exercise_configs
+    ALTER COLUMN num_reps
+    TYPE INTEGER
+    USING NULLIF(TRIM(num_reps::text), '')::INTEGER
+    """)
+
+    op.execute("""
+    ALTER TABLE exercise_configs
+    ALTER COLUMN descanso_rep
+    TYPE INTEGER
+    USING NULLIF(TRIM(descanso_rep::text), '')::INTEGER
+    """)
+
+    op.execute("""
+    ALTER TABLE exercise_configs
+    ALTER COLUMN descanso_serie
+    TYPE INTEGER
+    USING NULLIF(TRIM(descanso_serie::text), '')::INTEGER
+    """)
+
+    op.execute("""
+    ALTER TABLE exercise_configs
+    ALTER COLUMN meta_extensao
+    TYPE INTEGER
+    USING NULLIF(TRIM(meta_extensao::text), '')::INTEGER
+    """)
+
+    op.execute("""
+    ALTER TABLE exercise_configs
+    ALTER COLUMN repouso_max
+    TYPE INTEGER
+    USING NULLIF(TRIM(repouso_max::text), '')::INTEGER
+    """)
+
+    op.execute("""
+    ALTER TABLE exercise_configs
+    ALTER COLUMN limite_tronco
+    TYPE INTEGER
+    USING NULLIF(TRIM(limite_tronco::text), '')::INTEGER
+    """)
+
+    op.execute("""
+    ALTER TABLE exercise_configs
+    ALTER COLUMN tolerancia
+    TYPE INTEGER
+    USING NULLIF(TRIM(tolerancia::text), '')::INTEGER
+    """)
 
     op.execute("UPDATE exercise_configs SET num_series = COALESCE(num_series, 1)")
     op.execute("UPDATE exercise_configs SET num_reps = COALESCE(num_reps, 5)")
