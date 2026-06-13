@@ -15,6 +15,7 @@ import PatientAssignmentsPage from "../pages/PatientAssignmentsPage";
 import MySessionsPage from "../pages/MySessionsPage";
 import SessionRunPage from "../pages/SessionRunPage";
 import UserSessionPage from "../pages/UserSessionPage";
+import MyAchievementsPage from "../pages/MyAchievementsPage";
 
 export default function AppRoutes() {
   return (
@@ -126,6 +127,15 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <SessionRunPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/achievements"
+        element={
+          <ProtectedRoute>
+            <MyAchievementsPage />
           </ProtectedRoute>
         }
       />

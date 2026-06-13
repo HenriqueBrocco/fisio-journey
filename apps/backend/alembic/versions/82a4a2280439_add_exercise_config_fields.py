@@ -19,25 +19,33 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("exercise_configs", sa.Column("num_series", sa.Integer(), nullable=True))
-    op.add_column("exercise_configs", sa.Column("num_reps", sa.Integer(), nullable=True))
-    op.add_column("exercise_configs", sa.Column("descanso_rep", sa.Integer(), nullable=True))
-    op.add_column("exercise_configs", sa.Column("descanso_serie", sa.Integer(), nullable=True))
-    op.add_column("exercise_configs", sa.Column("lado_ativo", sa.String(), nullable=True))
-    op.add_column("exercise_configs", sa.Column("meta_extensao", sa.Integer(), nullable=True))
-    op.add_column("exercise_configs", sa.Column("repouso_max", sa.Integer(), nullable=True))
-    op.add_column("exercise_configs", sa.Column("limite_tronco", sa.Integer(), nullable=True))
-    op.add_column("exercise_configs", sa.Column("tolerancia", sa.Integer(), nullable=True))
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    existing_columns = {col["name"] for col in inspector.get_columns("exercise_configs")}
 
-    op.execute("UPDATE exercise_configs SET num_series = 1 WHERE num_series IS NULL")
-    op.execute("UPDATE exercise_configs SET num_reps = 5 WHERE num_reps IS NULL")
-    op.execute("UPDATE exercise_configs SET descanso_rep = 3 WHERE descanso_rep IS NULL")
-    op.execute("UPDATE exercise_configs SET descanso_serie = 30 WHERE descanso_serie IS NULL")
-    op.execute("UPDATE exercise_configs SET lado_ativo = 'Perna direita' WHERE lado_ativo IS NULL")
-    op.execute("UPDATE exercise_configs SET meta_extensao = 145 WHERE meta_extensao IS NULL")
-    op.execute("UPDATE exercise_configs SET repouso_max = 110 WHERE repouso_max IS NULL")
-    op.execute("UPDATE exercise_configs SET limite_tronco = 15 WHERE limite_tronco IS NULL")
-    op.execute("UPDATE exercise_configs SET tolerancia = 5 WHERE tolerancia IS NULL")
+    def add_column_if_missing(name: str, column):
+        if name not in existing_columns:
+            op.add_column("exercise_configs", column)
+
+    add_column_if_missing("num_series", sa.Column("num_series", sa.Integer(), nullable=True))
+    add_column_if_missing("num_reps", sa.Column("num_reps", sa.Integer(), nullable=True))
+    add_column_if_missing("descanso_rep", sa.Column("descanso_rep", sa.Integer(), nullable=True))
+    add_column_if_missing("descanso_serie", sa.Column("descanso_serie", sa.Integer(), nullable=True))
+    add_column_if_missing("lado_ativo", sa.Column("lado_ativo", sa.String(), nullable=True))
+    add_column_if_missing("meta_extensao", sa.Column("meta_extensao", sa.Integer(), nullable=True))
+    add_column_if_missing("repouso_max", sa.Column("repouso_max", sa.Integer(), nullable=True))
+    add_column_if_missing("limite_tronco", sa.Column("limite_tronco", sa.Integer(), nullable=True))
+    add_column_if_missing("tolerancia", sa.Column("tolerancia", sa.Integer(), nullable=True))
+
+    op.execute("UPDATE exercise_configs SET num_series = COALESCE(num_series, 1)")
+    op.execute("UPDATE exercise_configs SET num_reps = COALESCE(num_reps, 5)")
+    op.execute("UPDATE exercise_configs SET descanso_rep = COALESCE(descanso_rep, 3)")
+    op.execute("UPDATE exercise_configs SET descanso_serie = COALESCE(descanso_serie, 30)")
+    op.execute("UPDATE exercise_configs SET lado_ativo = COALESCE(lado_ativo, 'Perna direita')")
+    op.execute("UPDATE exercise_configs SET meta_extensao = COALESCE(meta_extensao, 145)")
+    op.execute("UPDATE exercise_configs SET repouso_max = COALESCE(repouso_max, 110)")
+    op.execute("UPDATE exercise_configs SET limite_tronco = COALESCE(limite_tronco, 15)")
+    op.execute("UPDATE exercise_configs SET tolerancia = COALESCE(tolerancia, 5)")
 
     op.alter_column("exercise_configs", "num_series", nullable=False)
     op.alter_column("exercise_configs", "num_reps", nullable=False)
@@ -51,12 +59,20 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column("exercise_configs", "tolerancia")
-    op.drop_column("exercise_configs", "limite_tronco")
-    op.drop_column("exercise_configs", "repouso_max")
-    op.drop_column("exercise_configs", "meta_extensao")
-    op.drop_column("exercise_configs", "lado_ativo")
-    op.drop_column("exercise_configs", "descanso_serie")
-    op.drop_column("exercise_configs", "descanso_rep")
-    op.drop_column("exercise_configs", "num_reps")
-    op.drop_column("exercise_configs", "num_series")
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    existing_columns = {col["name"] for col in inspector.get_columns("exercise_configs")}
+
+    def drop_column_if_exists(name: str):
+        if name in existing_columns:
+            op.drop_column("exercise_configs", name)
+
+    drop_column_if_exists("tolerancia")
+    drop_column_if_exists("limite_tronco")
+    drop_column_if_exists("repouso_max")
+    drop_column_if_exists("meta_extensao")
+    drop_column_if_exists("lado_ativo")
+    drop_column_if_exists("descanso_serie")
+    drop_column_if_exists("descanso_rep")
+    drop_column_if_exists("num_reps")
+    drop_column_if_exists("num_series")

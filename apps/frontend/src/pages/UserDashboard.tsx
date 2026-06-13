@@ -238,6 +238,22 @@ export default function UserDashboard() {
 
         <section className="rounded-2xl border border-border/60 bg-card/80 p-5 shadow-sm backdrop-blur">
           <div className="mb-4">
+            <h2 className="text-sm font-semibold tracking-tight">Conquistas</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Veja suas conquistas desbloqueadas e acompanhe sua evolução.
+            </p>
+          </div>
+
+          <button
+            onClick={() => navigate("/achievements")}
+            className="w-full sm:w-auto rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground shadow-button hover:opacity-90 transition"
+          >
+            Minhas conquistas
+          </button>
+        </section>
+
+        <section className="rounded-2xl border border-border/60 bg-card/80 p-5 shadow-sm backdrop-blur">
+          <div className="mb-4">
             <h2 className="text-sm font-semibold tracking-tight">Sessões</h2>
             <p className="mt-1 text-xs text-muted-foreground">
               Veja suas sessões e inicie o exercício com a câmera.
