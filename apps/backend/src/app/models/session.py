@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -18,8 +18,8 @@ class Session(Base):
     status: Mapped[str] = mapped_column(String(20), default="CREATED")  # CREATED/RUNNING/FINISHED
     config_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
 
-    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class SessionSummary(Base):
@@ -30,4 +30,4 @@ class SessionSummary(Base):
     rom: Mapped[float] = mapped_column(Float, default=0.0)
     cadence: Mapped[float | None] = mapped_column(Float, nullable=True)
     alerts: Mapped[list] = mapped_column(JSON, default=list)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))

@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -22,8 +22,8 @@ def create_access_token(sub: str, role: str, expires_minutes: int = 60) -> str:
     payload = {
         "sub": sub,
         "role": role,
-        "exp": datetime.utcnow() + timedelta(minutes=expires_minutes),
-        "iat": datetime.utcnow(),
+        "exp": datetime(timezone=True).now(timezone.utc)() + timedelta(minutes=expires_minutes),
+        "iat": datetime(timezone=True).now(timezone.utc)(),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 

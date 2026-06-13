@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -13,9 +13,8 @@ class ExerciseConfig(Base):
     exercise_id: Mapped[int] = mapped_column(Integer, ForeignKey("exercises.id"))
     patient_user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"))
 
-    # Deixa flexível em JSON pra amputação / futuro:
     params: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
     num_series: Mapped[int] = mapped_column(Integer)
     num_reps: Mapped[int] = mapped_column(Integer)
@@ -39,4 +38,4 @@ class Assignment(Base):
     schedule: Mapped[str] = mapped_column(String(30), default="DAILY")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
@@ -130,7 +130,7 @@ async def ws_infer_session(websocket: WebSocket, session_id: str):
         # 3) start automático
         if sess.status == "CREATED":
             sess.status = "RUNNING"
-            sess.started_at = datetime.utcnow()
+            sess.started_at = datetime(timezone=True).now(timezone.utc)()
             db.add(sess)
             db.commit()
             db.refresh(sess)
@@ -257,7 +257,7 @@ async def ws_infer_session(websocket: WebSocket, session_id: str):
 
                 if sess.status != "FINISHED":
                     sess.status = "FINISHED"
-                    sess.finished_at = datetime.utcnow()
+                    sess.finished_at = datetime(timezone=True).now(timezone.utc)()
                     db.add(sess)
 
                 db.commit()

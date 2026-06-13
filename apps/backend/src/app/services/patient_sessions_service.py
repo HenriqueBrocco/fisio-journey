@@ -110,7 +110,18 @@ def create_session_from_assignment(
         patient_user_id=asg.patient_user_id,
         exercise_id=asg.exercise_id,
         assignment_id=asg.id,
-        config_snapshot=cfg.params or {},
+        config_snapshot={
+            "params": cfg.params or {},
+            "num_series": cfg.num_series,
+            "num_reps": cfg.num_reps,
+            "descanso_rep": cfg.descanso_rep,
+            "descanso_serie": cfg.descanso_serie,
+            "lado_ativo": cfg.lado_ativo,
+            "meta_extensao": cfg.meta_extensao,
+            "repouso_max": cfg.repouso_max,
+            "limite_tronco": cfg.limite_tronco,
+            "tolerancia": cfg.tolerancia,
+        },
     )
     db.add(s)
     db.commit()

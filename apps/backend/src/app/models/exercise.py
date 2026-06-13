@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -15,4 +15,4 @@ class Exercise(Base):
     description: Mapped[str] = mapped_column(String(1000), default="")
     body_focus: Mapped[str] = mapped_column(String(30), default="TRUNK")  # TRUNK/UPPER/LOWER
     analysis_kind: Mapped[str] = mapped_column(String(40), default="V1_LITE_THRESHOLDS")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))

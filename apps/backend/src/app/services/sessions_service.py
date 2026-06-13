@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DBSession
@@ -43,7 +43,7 @@ def start_session(db: DBSession, user: User, session_id: str) -> SessionModel:
 
     if s.status == "CREATED":
         s.status = "RUNNING"
-        s.started_at = datetime.utcnow()
+        s.started_at = datetime(timezone=True).now(timezone.utc)
 
     db.add(s)
     db.commit()
@@ -57,7 +57,7 @@ def finish_session(db: DBSession, user: User, session_id: str) -> SessionModel:
 
     if s.status != "FINISHED":
         s.status = "FINISHED"
-        s.finished_at = datetime.utcnow()
+        s.finished_at = datetime(timezone=True).now(timezone.utc)
 
     db.add(s)
     db.commit()
@@ -147,7 +147,7 @@ def finalize_session(
 
     if s.status != "FINISHED":
         s.status = "FINISHED"
-        s.finished_at = datetime.utcnow()
+        s.finished_at = datetime(timezone=True).now(timezone.utc)
 
     db.add(s)
     db.commit()
