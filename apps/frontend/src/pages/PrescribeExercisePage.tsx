@@ -31,11 +31,22 @@ export default function PrescribeExercisePage() {
   const [query, setQuery] = useState("");
   const [selectedExerciseId, setSelectedExerciseId] = useState<number | null>(null);
 
-  const [paramsText, setParamsText] = useState("{\n  \n}\n");
   const [schedule, setSchedule] = useState<"DAILY" | "WEEKLY" | "MONTHLY">("DAILY");
   const [active, setActive] = useState(true);
 
   const [patient, setPatient] = useState<Patient | null>(null);
+
+  const [configForm, setConfigForm] = useState({
+    num_series: 3,
+    num_reps: 5,
+    descanso_rep: 3,
+    descanso_serie: 30,
+    lado_ativo: "Perna direita",
+    meta_extensao: 145,
+    repouso_max: 110,
+    limite_tronco: 15,
+    tolerancia: 5,
+  });
 
   const fetchExercises = async () => {
     setLoading(true);
@@ -75,7 +86,6 @@ export default function PrescribeExercisePage() {
     };
 
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPro, patientId]);
 
   const selectedExercise = useMemo(() => {
@@ -96,14 +106,15 @@ export default function PrescribeExercisePage() {
     });
   }, [exercises, query]);
 
-  const parseParams = () => {
-    try {
-      const obj = JSON.parse(paramsText || "{}");
-      if (obj && typeof obj === "object") return obj;
-      throw new Error("Params deve ser um JSON objeto.");
-    } catch (e: any) {
-      throw new Error(`Params inválido: ${e?.message || "JSON inválido"}`);
-    }
+  const handleConfigChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+
+    setConfigForm((prev) => ({
+      ...prev,
+      [name]: name === "lado_ativo" ? value : Number(value),
+    }));
   };
 
   const onSubmit = async () => {
@@ -114,16 +125,9 @@ export default function PrescribeExercisePage() {
       setError("patientId inválido.");
       return;
     }
+
     if (selectedExerciseId == null) {
       setError("Selecione um exercício.");
-      return;
-    }
-
-    let paramsObj: Record<string, any>;
-    try {
-      paramsObj = parseParams();
-    } catch (e: any) {
-      setError(e.message);
       return;
     }
 
@@ -132,7 +136,8 @@ export default function PrescribeExercisePage() {
       const cfg = await createAssignmentConfig({
         exercise_id: selectedExerciseId,
         patient_user_id: patientId,
-        params: paramsObj,
+        params: {},
+        ...configForm,
       });
 
       const asg = await createAssignment({
@@ -167,7 +172,6 @@ export default function PrescribeExercisePage() {
   return (
     <div className="min-h-screen bg-[image:var(--gradient-bg)] px-4 py-6 sm:py-8">
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        {/* Header */}
         <section className="rounded-2xl border border-border/60 bg-card/80 p-5 shadow-sm backdrop-blur">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -214,9 +218,7 @@ export default function PrescribeExercisePage() {
           )}
         </section>
 
-        {/* Content */}
         <section className="grid gap-4 lg:grid-cols-[1.2fr,1fr]">
-          {/* Left: selecionar exercício */}
           <div className="rounded-2xl border border-border/60 bg-card/80 shadow-sm backdrop-blur overflow-hidden">
             <div className="px-5 py-4 border-b border-border/60">
               <h2 className="text-sm font-semibold tracking-tight">1 - Escolher exercício</h2>
@@ -280,32 +282,121 @@ export default function PrescribeExercisePage() {
             </div>
           </div>
 
-          {/* Right: params + schedule */}
           <div className="rounded-2xl border border-border/60 bg-card/80 shadow-sm backdrop-blur overflow-hidden">
             <div className="px-5 py-4 border-b border-border/60">
               <h2 className="text-sm font-semibold tracking-tight">2 - Configurar & criar</h2>
-              <p className="mt-1 text-xs text-muted-foreground">Defina parâmetros e ative a prescrição.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Defina a configuração clínica e crie a prescrição.</p>
             </div>
 
             <div className="p-4 grid gap-4">
               <div className="rounded-xl border border-border/60 bg-background/60 p-3">
                 <p className="text-xs text-muted-foreground">Exercício selecionado</p>
                 <p className="mt-1 text-sm font-semibold">
-                  {selectedExercise ? `${selectedExercise.title}` : "—"}
+                  {selectedExercise ? selectedExercise.title : "—"}
                 </p>
               </div>
 
-              <div className="grid gap-1.5">
-                <label className="text-sm font-medium">Parâmetros (JSON)</label>
-                <textarea
-                  value={paramsText}
-                  onChange={(e) => setParamsText(e.target.value)}
-                  spellCheck={false}
-                  className="min-h-[220px] w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-[hsl(var(--ring)/0.35)]"
-                />
-                <p className="text-xs text-muted-foreground">
-                  MVP: params é JSON livre. Depois a gente guia por <code>analysis_kind</code>.
-                </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <label className="text-sm font-medium">Séries</label>
+                  <input
+                    type="number"
+                    name="num_series"
+                    value={configForm.num_series}
+                    onChange={handleConfigChange}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <label className="text-sm font-medium">Repetições por série</label>
+                  <input
+                    type="number"
+                    name="num_reps"
+                    value={configForm.num_reps}
+                    onChange={handleConfigChange}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <label className="text-sm font-medium">Descanso repetição (s)</label>
+                  <input
+                    type="number"
+                    name="descanso_rep"
+                    value={configForm.descanso_rep}
+                    onChange={handleConfigChange}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <label className="text-sm font-medium">Descanso série (s)</label>
+                  <input
+                    type="number"
+                    name="descanso_serie"
+                    value={configForm.descanso_serie}
+                    onChange={handleConfigChange}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <label className="text-sm font-medium">Lado ativo</label>
+                  <select
+                    name="lado_ativo"
+                    value={configForm.lado_ativo}
+                    onChange={handleConfigChange}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
+                  >
+                    <option value="Perna direita">Perna direita</option>
+                    <option value="Perna esquerda">Perna esquerda</option>
+                  </select>
+                </div>
+
+                <div className="grid gap-1.5">
+                  <label className="text-sm font-medium">Meta extensão (°)</label>
+                  <input
+                    type="number"
+                    name="meta_extensao"
+                    value={configForm.meta_extensao}
+                    onChange={handleConfigChange}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <label className="text-sm font-medium">Repouso máximo (°)</label>
+                  <input
+                    type="number"
+                    name="repouso_max"
+                    value={configForm.repouso_max}
+                    onChange={handleConfigChange}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
+                  />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <label className="text-sm font-medium">Limite tronco (°)</label>
+                  <input
+                    type="number"
+                    name="limite_tronco"
+                    value={configForm.limite_tronco}
+                    onChange={handleConfigChange}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
+                  />
+                </div>
+
+                <div className="grid gap-1.5 sm:col-span-2">
+                  <label className="text-sm font-medium">Tolerância (%)</label>
+                  <input
+                    type="number"
+                    name="tolerancia"
+                    value={configForm.tolerancia}
+                    onChange={handleConfigChange}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
+                  />
+                </div>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -314,7 +405,7 @@ export default function PrescribeExercisePage() {
                   <select
                     value={schedule}
                     onChange={(e) => setSchedule(e.target.value as any)}
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring)/0.35)]"
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
                   >
                     <option value="DAILY">Diário</option>
                     <option value="WEEKLY">Semanal</option>
@@ -327,7 +418,7 @@ export default function PrescribeExercisePage() {
                   <select
                     value={active ? "true" : "false"}
                     onChange={(e) => setActive(e.target.value === "true")}
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring)/0.35)]"
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
                   >
                     <option value="true">Verdadeiro</option>
                     <option value="false">Falso</option>

@@ -160,7 +160,7 @@ export const MocapCamera = ({
 
       try {
         const data = await apiFetch<AssignmentConfigResponse[]>(
-          `/v1/assignments/configs?patient_user_id=${patientUserId}&exercise_id=${exerciseId}`
+          `exercise-configs?patient_user_id=${patientUserId}&exercise_id=${exerciseId}`
         );
 
         if (!data?.length) return;

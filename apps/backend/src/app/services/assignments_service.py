@@ -39,7 +39,20 @@ def _get_patient(db: DBSession, patient_user_id: str, pro_user: User | None = No
 
 
 def create_exercise_config(
-    db: DBSession, exercise_id: int, patient_user_id: str, params: dict, pro_user: User
+    db: DBSession,
+    exercise_id: int,
+    patient_user_id: str,
+    params: dict,
+    num_series: int,
+    num_reps: int,
+    descanso_rep: int,
+    descanso_serie: int,
+    lado_ativo: str,
+    meta_extensao: int,
+    repouso_max: int,
+    limite_tronco: int,
+    tolerancia: int,
+    pro_user: User,
 ) -> ExerciseConfig:
     _get_exercise(db, exercise_id)
     _get_patient(db, patient_user_id, pro_user=pro_user)
@@ -48,6 +61,15 @@ def create_exercise_config(
         exercise_id=exercise_id,
         patient_user_id=patient_user_id,
         params=params,
+        num_series=num_series,
+        num_reps=num_reps,
+        descanso_rep=descanso_rep,
+        descanso_serie=descanso_serie,
+        lado_ativo=lado_ativo,
+        meta_extensao=meta_extensao,
+        repouso_max=repouso_max,
+        limite_tronco=limite_tronco,
+        tolerancia=tolerancia,
     )
     db.add(cfg)
     db.commit()

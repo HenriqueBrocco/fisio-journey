@@ -15,6 +15,13 @@ type PatientSession = {
   assignment_id?: number;
 };
 
+type Exercise = {
+  id: number;
+  title: string;
+  analysis_kind?: string;
+  body_focus?: string;
+};
+
 export default function UserDashboard() {
   const { me, logout } = useAuth();
   const navigate = useNavigate();
@@ -22,16 +29,28 @@ export default function UserDashboard() {
 
   const [sessions, setSessions] = useState<PatientSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exerciseMap, setExerciseMap] = useState<Record<number, Exercise>>({});
 
   useEffect(() => {
     const run = async () => {
       if (!me?.id) return;
       setLoading(true);
       try {
-        const data = await apiFetch<PatientSession[]>(`/v1/patients/${me.id}/sessions`);
-        setSessions(Array.isArray(data) ? data : []);
+        const [sessionData, exerciseData] = await Promise.all([
+          apiFetch<PatientSession[]>(`/v1/patients/${me.id}/sessions`),
+          apiFetch<Exercise[]>("/v1/exercises"),
+        ]);
+
+        setSessions(Array.isArray(sessionData) ? sessionData : []);
+
+        const map: Record<number, Exercise> = {};
+        (Array.isArray(exerciseData) ? exerciseData : []).forEach((ex) => {
+          map[ex.id] = ex;
+        });
+        setExerciseMap(map);
       } catch {
         setSessions([]);
+        setExerciseMap({});
       } finally {
         setLoading(false);
       }
@@ -57,6 +76,22 @@ export default function UserDashboard() {
     });
     return pend.slice(0, 3);
   }, [sessions]);
+
+  const exerciseStats = useMemo(() => {
+    const ids = new Set(
+      pendingSessions
+        .map((s) => s.exercise_id)
+        .filter((id): id is number => typeof id === "number")
+    );
+
+    return {
+      distinctPendingExercises: ids.size,
+      nextExerciseTitle:
+        pendingSessions.length > 0 && pendingSessions[0].exercise_id != null
+          ? exerciseMap[pendingSessions[0].exercise_id]?.title || "Exercício disponível"
+          : "Nenhum exercício pendente",
+    };
+  }, [pendingSessions, exerciseMap]);
 
   return (
     <div className="min-h-screen bg-[image:var(--gradient-bg)] px-4 py-6 sm:py-8">
@@ -117,10 +152,19 @@ export default function UserDashboard() {
           <div className="rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">Exercícios</span>
-              <span className="text-primary text-sm font-semibold">Em breve</span>
             </div>
-            <p className="mt-3 text-3xl font-semibold tracking-tight">—</p>
-            <p className="mt-1 text-xs text-muted-foreground">Vamos integrar com prescrições/assignments.</p>
+
+            <p className="mt-3 text-3xl font-semibold tracking-tight">
+              {loading ? "…" : exerciseStats.distinctPendingExercises}
+            </p>
+
+            <p className="mt-1 text-xs text-muted-foreground">
+              {loading
+                ? "Carregando…"
+                : exerciseStats.distinctPendingExercises > 0
+                  ? `${exerciseStats.nextExerciseTitle}`
+                  : "Nenhum exercício pendente"}
+            </p>
           </div>
 
           <div className="rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur">
@@ -167,10 +211,16 @@ export default function UserDashboard() {
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">
-                      Sessão {s.id.slice(0, 8)}…
+                      {s.exercise_id != null
+                        ? (exerciseMap[s.exercise_id]?.title || `Exercício #${s.exercise_id}`)
+                        : "Exercício"}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Status: {s.status}
+                      {s.status === "CREATED"
+                        ? "Pronto para iniciar"
+                        : s.status === "RUNNING"
+                          ? "Sessão em andamento"
+                          : `Status: ${s.status}`}
                     </p>
                   </div>
 
@@ -200,16 +250,6 @@ export default function UserDashboard() {
           >
             Minhas sessões
           </button>
-        </section>
-
-        {/* Próximos passos (sem mock de dados) */}
-        <section className="rounded-2xl border border-border/60 bg-card/80 p-5 shadow-sm backdrop-blur">
-          <h2 className="text-sm font-semibold tracking-tight">Próximos passos</h2>
-          <ul className="mt-3 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
-            <li>Integrar prescrições (assignments) do paciente.</li>
-            <li>Melhorar UX da sessão (instruções, estados e resumo).</li>
-            <li>Aplicar design tokens e padronizar telas.</li>
-          </ul>
         </section>
       </main>
     </div>

@@ -13,7 +13,8 @@ type Patient = {
 type Assignment = {
   id: number | string;
   exercise_id?: number;
-  status?: string;
+  active?: boolean;
+  schedule?: string;
   created_at?: string;
 };
 
@@ -213,7 +214,8 @@ export default function PatientDetailsPage() {
                       >
                         <p className="text-sm font-semibold">{exTitle}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {a.status ? `Status: ${a.status}` : "Status: —"}
+                          Status: {a.active === true ? "Ativa" : a.active === false ? "Inativa" : "—"}
+                          {a.schedule === "DAILY"? ` • Frequência: Diário` : a.schedule === "WEEKLY"? ` • Frequência: Semanal` : ` • Frequência: Mensal`}
                         </p>
                       </div>
                     );

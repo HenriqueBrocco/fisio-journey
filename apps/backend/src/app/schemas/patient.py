@@ -1,7 +1,6 @@
 # NOTE: Por enquanto, "Paciente" é um User com role="PATIENT".
 # Futuro: criar tabela patient_profile se precisarmos de dados clínicos extras.
 
-
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 

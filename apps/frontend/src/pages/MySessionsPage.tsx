@@ -142,9 +142,7 @@ export default function MySessionsPage() {
                                                         {ex?.title || `Exercício #${s.exercise_id}`}
                                                     </p>
                                                     <p className="mt-1 text-xs text-muted-foreground">
-                                                        {ex?.analysis_kind ? `${ex.analysis_kind} • ` : ""}
-                                                        {ex?.body_focus ? `${ex.body_focus} • ` : ""}
-                                                        assignment #{s.assignment_id}
+                                                        {getSessionSubtitle(s)}
                                                     </p>
                                                 </div>
 
@@ -169,3 +167,36 @@ function StatusBadge({ status }: { status: string }) {
     if (status === "FINISHED") return <span className={`${base} bg-emerald-500/10 text-emerald-500`}>Concluída</span>;
     return <span className={`${base} bg-muted text-muted-foreground`}>{status}</span>;
 }
+
+function formatDate(iso: string) {
+    try {
+        return new Date(iso).toLocaleString("pt-BR");
+    } catch {
+        return iso;
+    }
+}
+
+function getSessionSubtitle(session: {
+    status: string;
+    started_at?: string | null;
+    finished_at?: string | null;
+}) {
+    if (session.status === "CREATED") {
+        return "Toque para iniciar esta sessão.";
+    }
+
+    if (session.status === "RUNNING") {
+        return session.started_at
+            ? `Toque para continuar. Iniciada em ${formatDate(session.started_at)}.`
+            : "Toque para continuar esta sessão.";
+    }
+
+    if (session.status === "FINISHED") {
+        return session.finished_at
+            ? `Toque para ver o resumo. Concluída em ${formatDate(session.finished_at)}.`
+            : "Toque para ver o resumo da sessão.";
+    }
+
+    return "Sessão disponível.";
+}
+

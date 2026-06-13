@@ -70,9 +70,6 @@ export default function NewExercisePage() {
               </Link>
 
               <h1 className="mt-2 text-lg font-semibold tracking-tight">Cadastrar exercício</h1>
-              <p className="mt-1 text-xs text-muted-foreground">
-                MVP: título, descrição e parâmetros básicos (vamos expandir depois).
-              </p>
             </div>
           </div>
 
@@ -99,7 +96,7 @@ export default function NewExercisePage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
-                placeholder="Ex.: Knee Extension"
+                placeholder="Ex.: Extensão de joelho"
                 className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring)/0.35)]"
               />
             </div>
@@ -116,23 +113,23 @@ export default function NewExercisePage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-1.5">
-                <label className="text-sm font-medium">Body focus</label>
+                <label className="text-sm font-medium">Parte do corpo em foco</label>
                 <input
                   value={bodyFocus}
                   onChange={(e) => setBodyFocus(e.target.value)}
                   className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring)/0.35)]"
                 />
-                <p className="text-xs text-muted-foreground">Ex.: TRUNK, KNEE, SHOULDER…</p>
+                <p className="text-xs text-muted-foreground">Ex.: Tronco, Perna, Ombro, ...</p>
               </div>
 
               <div className="grid gap-1.5">
-                <label className="text-sm font-medium">Analysis kind</label>
+                <label className="text-sm font-medium">Método de análise</label>
                 <input
                   value={analysisKind}
                   onChange={(e) => setAnalysisKind(e.target.value)}
                   className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring)/0.35)]"
                 />
-                <p className="text-xs text-muted-foreground">Ex.: V1_LITE_THRESHOLDS…</p>
+                <p className="text-xs text-muted-foreground">Ex.: KNEE_EXTENSION_V1…</p>
               </div>
             </div>
 

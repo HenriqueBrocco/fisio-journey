@@ -4,6 +4,16 @@ export type CreateConfigRequest = {
   exercise_id: number;
   patient_user_id: string;
   params: Record<string, any>;
+
+  num_series: number;
+  num_reps: number;
+  descanso_rep: number;
+  descanso_serie: number;
+  lado_ativo: string;
+  meta_extensao: number;
+  repouso_max: number;
+  limite_tronco: number;
+  tolerancia: number;
 };
 
 export type CreateConfigResponse = {
@@ -11,6 +21,17 @@ export type CreateConfigResponse = {
   exercise_id: number;
   patient_user_id: string;
   params: Record<string, any>;
+
+  num_series: number;
+  num_reps: number;
+  descanso_rep: number;
+  descanso_serie: number;
+  lado_ativo: string;
+  meta_extensao: number;
+  repouso_max: number;
+  limite_tronco: number;
+  tolerancia: number;
+
   created_at: string;
 };
 
@@ -33,7 +54,7 @@ export type CreateAssignmentResponse = {
 };
 
 export function createAssignmentConfig(payload: CreateConfigRequest) {
-  return apiFetch<CreateConfigResponse>("/v1/assignments/configs", {
+  return apiFetch<CreateConfigResponse>("/v1/exercise-configs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

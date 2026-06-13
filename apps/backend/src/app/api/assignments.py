@@ -8,74 +8,21 @@ from app.schemas.assignment import (
     AssignmentCreate,
     AssignmentOut,
     AssignmentUpdate,
-    ConfigParamsUpdate,
-    ExerciseConfigCreate,
-    ExerciseConfigOut,
 )
 from app.schemas.session import SessionOut
 from app.services.assignments_service import (
     BadRequestError,
     NotFoundError,
     create_assignment,
-    create_exercise_config,
     get_assignment,
-    get_config,
     list_assignments,
-    list_configs,
     update_assignment,
 )
-from app.services.exercise_config_service import BadRequestError as CfgBadRequest
 from app.services.exercise_config_service import BadRequestError as SessBadRequest
-from app.services.exercise_config_service import NotFoundError as CfgNotFound
 from app.services.exercise_config_service import NotFoundError as SessNotFound
-from app.services.exercise_config_service import update_config_params
 from app.services.patient_sessions_service import create_session_from_assignment
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
-
-
-# -------- Exercise Configs --------
-
-
-@router.post("/configs", response_model=ExerciseConfigOut, status_code=status.HTTP_201_CREATED)
-def create_config_endpoint(
-    payload: ExerciseConfigCreate,
-    db: DBSession = Depends(get_db),
-    _=Depends(require_role("PRO")),
-    user: User = Depends(get_current_user),
-):
-    try:
-        return create_exercise_config(
-            db, payload.exercise_id, payload.patient_user_id, payload.params, user
-        )
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except BadRequestError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/configs", response_model=list[ExerciseConfigOut])
-def list_configs_endpoint(
-    db: DBSession = Depends(get_db),
-    user: User = Depends(get_current_user),
-    patient_user_id: str | None = None,
-    exercise_id: int | None = None,
-):
-    if user.role == "PATIENT":
-        patient_user_id = user.id
-
-    return list_configs(db, patient_user_id, exercise_id)
-
-
-@router.get("/configs/{config_id}", response_model=ExerciseConfigOut)
-def get_config_endpoint(config_id: int, db: DBSession = Depends(get_db)):
-    try:
-        return get_config(db, config_id)
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-# -------- Assignments --------
 
 
 @router.post("", response_model=AssignmentOut, status_code=status.HTTP_201_CREATED)
@@ -122,7 +69,6 @@ def get_assignment_endpoint(
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except BadRequestError as e:
-        # aqui usamos 403 para permissão
         if str(e) == "Sem permissão":
             raise HTTPException(status_code=403, detail=str(e))
         raise HTTPException(status_code=400, detail=str(e))
@@ -149,22 +95,6 @@ def update_assignment_endpoint(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.put("/configs/{config_id}/params", response_model=ExerciseConfigOut)
-def update_config_params_endpoint(
-    config_id: int,
-    payload: ConfigParamsUpdate,
-    db: DBSession = Depends(get_db),
-    _=Depends(require_role("PRO")),
-    user: User = Depends(get_current_user),
-):
-    try:
-        return update_config_params(db, user, config_id, payload.params)
-    except CfgNotFound as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except CfgBadRequest as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
 @router.post(
     "/{assignment_id}/sessions", response_model=SessionOut, status_code=status.HTTP_201_CREATED
 )
@@ -178,7 +108,6 @@ def create_session_from_assignment_endpoint(
     except SessNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     except SessBadRequest as e:
-        # permissão
         if str(e) == "Sem permissão":
             raise HTTPException(status_code=403, detail=str(e))
         raise HTTPException(status_code=400, detail=str(e))

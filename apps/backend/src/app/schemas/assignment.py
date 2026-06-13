@@ -11,6 +11,16 @@ class ExerciseConfigCreate(BaseModel):
     patient_user_id: str
     params: dict[str, Any] = Field(default_factory=dict)
 
+    num_series: int
+    num_reps: int
+    descanso_rep: int
+    descanso_serie: int
+    lado_ativo: str
+    meta_extensao: int
+    repouso_max: int
+    limite_tronco: int
+    tolerancia: int
+
 
 class ExerciseConfigOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
