@@ -16,6 +16,8 @@ import MySessionsPage from "../pages/MySessionsPage";
 import SessionRunPage from "../pages/SessionRunPage";
 import UserSessionPage from "../pages/UserSessionPage";
 import MyAchievementsPage from "../pages/MyAchievementsPage";
+import AboutPage from "@/pages/AboutPage";
+import PatientSessionsPage from "@/pages/PatientSessionsPage";
 
 export default function AppRoutes() {
   return (
@@ -136,6 +138,24 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <MyAchievementsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/about"
+        element={
+          <ProtectedRoute>
+            <AboutPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/patients/:id/sessions"
+        element={
+          <ProtectedRoute>
+            <PatientSessionsPage />
           </ProtectedRoute>
         }
       />

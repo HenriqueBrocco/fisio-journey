@@ -52,6 +52,26 @@ def grant_achievement_if_missing(
     }
 
 
+def evaluate_login_achievements(
+    db: DBSession,
+    user_id: str,
+) -> list[dict]:
+    unlocked_now: list[dict] = []
+
+    ach = grant_achievement_if_missing(
+        db,
+        user_id=user_id,
+        code="AC01",
+        source="primeiro_login",
+        progress=100,
+    )
+    if ach:
+        unlocked_now.append(ach)
+        db.commit()
+
+    return unlocked_now
+
+
 def evaluate_finished_session_achievements(
     db: DBSession,
     user_id: str,

@@ -18,6 +18,26 @@ type Exercise = {
   title: string;
 };
 
+type Session = {
+  id: string;
+  patient_user_id?: string;
+  exercise_id?: number;
+  assignment_id?: number;
+  status?: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  created_at?: string;
+};
+
+type SessionSummary = {
+  session_id: string;
+  reps: number;
+  rom: number;
+  cadence: number | null;
+  alerts: string[];
+  accuracy?: number | null;
+};
+
 export default function ProDashboard() {
   const { me, logout, isPro } = useAuth();
   const { theme, toggle } = useTheme();
@@ -26,23 +46,57 @@ export default function ProDashboard() {
   const [createPatientOpen, setCreatePatientOpen] = useState(false);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [allSessions, setAllSessions] = useState<Session[]>([]);
+  const [allSummaries, setAllSummaries] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAll = async () => {
     setLoading(true);
     setError(null);
+
     try {
       const [p, e] = await Promise.all([
         apiFetch<Patient[]>("/v1/my/patients"),
         apiFetch<Exercise[]>("/v1/exercises"),
       ]);
-      setPatients(Array.isArray(p) ? p : []);
+
+      const patientList = Array.isArray(p) ? p : [];
+      setPatients(patientList);
       setExercises(Array.isArray(e) ? e : []);
+
+      const sessionsByPatient = await Promise.all(
+        patientList.map(async (patient) => {
+          try {
+            const sessions = await apiFetch<Session[]>(`/v1/patients/${patient.id}/sessions`);
+            return Array.isArray(sessions) ? sessions : [];
+          } catch {
+            return [];
+          }
+        })
+      );
+
+      const mergedSessions = sessionsByPatient.flat();
+      setAllSessions(mergedSessions);
+
+      const summaryEntries = await Promise.all(
+        mergedSessions.map(async (sess) => {
+          try {
+            const summary = await apiFetch<SessionSummary>(`/v1/sessions/${sess.id}/summary`);
+            return summary;
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      setAllSummaries(summaryEntries.filter(Boolean) as SessionSummary[]);
     } catch (err: any) {
       setError(err?.message || "Erro ao carregar dados do dashboard.");
       setPatients([]);
       setExercises([]);
+      setAllSessions([]);
+      setAllSummaries([]);
     } finally {
       setLoading(false);
     }
@@ -57,6 +111,36 @@ export default function ProDashboard() {
   const recentPatients = useMemo(() => {
     return [...patients].sort((a, b) => (a.name || "").localeCompare(b.name || "")).slice(0, 5);
   }, [patients]);
+
+  const followUpStats = useMemo(() => {
+    const finishedSessions = allSessions.filter((s) => s.status === "FINISHED");
+    const uniquePatientsWithSessions = new Set(
+      finishedSessions
+        .map((s) => {
+          const patient = patients.find((p) => p.id === (s as any).patient_user_id);
+          return patient?.id;
+        })
+        .filter(Boolean)
+    );
+
+    const summariesWithAccuracy = allSummaries.filter(
+      (s) => typeof s.accuracy === "number"
+    );
+
+    const averageAccuracy =
+      summariesWithAccuracy.length > 0
+        ? Math.round(
+          summariesWithAccuracy.reduce((acc, s) => acc + (s.accuracy ?? 0), 0) /
+          summariesWithAccuracy.length
+        )
+        : null;
+
+    return {
+      finishedSessions: finishedSessions.length,
+      patientsWithSessions: uniquePatientsWithSessions.size,
+      averageAccuracy,
+    };
+  }, [allSessions, allSummaries, patients]);
 
   if (!isPro) {
     return (
@@ -73,7 +157,6 @@ export default function ProDashboard() {
 
   return (
     <div className="min-h-screen bg-[image:var(--gradient-bg)] px-4 py-6 sm:py-8">
-      {/* Header */}
       <header className="mx-auto flex w-full max-w-6xl flex-col gap-4 rounded-2xl bg-card/80 px-4 py-4 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex items-center gap-3">
           <FisioJourneyLogo className="w-10 sm:w-12 h-auto" />
@@ -86,6 +169,13 @@ export default function ProDashboard() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <Link
+            to="/about"
+            className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-medium hover:bg-muted/50 transition"
+          >
+            Sobre
+          </Link>
+
           <button
             onClick={toggle}
             className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-medium hover:bg-muted/50 transition"
@@ -106,7 +196,6 @@ export default function ProDashboard() {
       </header>
 
       <main className="mx-auto mt-6 flex w-full max-w-6xl flex-col gap-6">
-        {/* Cards */}
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur">
             <div className="flex items-center justify-between">
@@ -131,14 +220,31 @@ export default function ProDashboard() {
               <span className="text-xs font-medium text-muted-foreground">Acompanhamento</span>
               <Calendar className="h-4 w-4 text-primary" />
             </div>
-            <p className="mt-3 text-3xl font-semibold tracking-tight">—</p>
-            <p className="mt-1 text-xs text-muted-foreground">Em breve (sessões / resultados)</p>
+
+            <p className="mt-3 text-3xl font-semibold tracking-tight">
+              {loading ? "…" : followUpStats.averageAccuracy != null ? `${followUpStats.averageAccuracy}%` : "—"}
+            </p>
+
+            <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
+              <p>
+                <strong>Sessões concluídas:</strong> {loading ? "…" : followUpStats.finishedSessions}
+              </p>
+              <p>
+                <strong>Pacientes com sessões:</strong> {loading ? "…" : followUpStats.patientsWithSessions}
+              </p>
+              <p>
+                <strong>Acurácia média:</strong>{" "}
+                {loading
+                  ? "…"
+                  : followUpStats.averageAccuracy != null
+                    ? `${followUpStats.averageAccuracy}%`
+                    : "—"}
+              </p>
+            </div>
           </div>
         </section>
 
-        {/* Main */}
         <section className="grid gap-4 lg:grid-cols-[2fr,1.2fr]">
-          {/* Pacientes recentes */}
           <div className="rounded-2xl border border-border/60 bg-card/80 shadow-sm backdrop-blur overflow-hidden">
             <div className="flex flex-col gap-3 px-5 py-4 border-b border-border/60 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -202,7 +308,6 @@ export default function ProDashboard() {
             </div>
           </div>
 
-          {/* Ações rápidas */}
           <div className="rounded-2xl border border-border/60 bg-card/80 p-5 shadow-sm backdrop-blur">
             <h2 className="text-sm font-semibold tracking-tight">Ações rápidas</h2>
             <p className="mt-1 text-xs text-muted-foreground">Atalhos para o que você mais usa.</p>
@@ -230,10 +335,6 @@ export default function ProDashboard() {
                 <Plus className="h-4 w-4" />
                 Cadastrar exercício
               </button>
-            </div>
-
-            <div className="mt-6 rounded-xl border border-border/60 bg-background/60 p-4 text-xs text-muted-foreground">
-              Próximo: acompanhar sessões/sumários dos pacientes.
             </div>
           </div>
         </section>

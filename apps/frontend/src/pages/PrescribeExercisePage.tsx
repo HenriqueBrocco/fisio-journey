@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
-import { createAssignment, createAssignmentConfig } from "@/services/assignments";
+import {
+  createAssignment,
+  createAssignmentConfig,
+  updateAssignment,
+  updateAssignmentConfigParams,
+} from "@/services/assignments";
 import { ArrowLeft, RefreshCw, Search, Sparkles } from "lucide-react";
 
 type Exercise = {
@@ -11,6 +16,33 @@ type Exercise = {
   description?: string;
   body_focus?: string;
   analysis_kind?: string;
+};
+
+type Assignment = {
+  id: number;
+  patient_user_id: string;
+  exercise_id: number;
+  config_id: number;
+  schedule: "DAILY" | "WEEKLY" | "MONTHLY";
+  active: boolean;
+  created_at: string;
+};
+
+type AssignmentConfigResponse = {
+  id: number;
+  exercise_id: number;
+  patient_user_id: string;
+  params: Record<string, unknown>;
+  num_series: number | null;
+  num_reps: number | null;
+  descanso_rep: number | null;
+  descanso_serie: number | null;
+  lado_ativo: string | null;
+  meta_extensao: number | null;
+  repouso_max: number | null;
+  limite_tronco: number | null;
+  tolerancia: number | null;
+  created_at: string;
 };
 
 type Patient = { id: string; name: string; email: string };
@@ -93,6 +125,8 @@ export default function PrescribeExercisePage() {
     return exercises.find((x) => x.id === selectedExerciseId) || null;
   }, [exercises, selectedExerciseId]);
 
+  const uiLabels = getExerciseUiLabels(selectedExercise?.analysis_kind);
+
   const filteredExercises = useMemo(() => {
     const q = query.trim().toLowerCase();
     const base = [...exercises].sort((a, b) => (a.title || "").localeCompare(b.title || ""));
@@ -133,28 +167,105 @@ export default function PrescribeExercisePage() {
 
     setSaving(true);
     try {
-      const cfg = await createAssignmentConfig({
-        exercise_id: selectedExerciseId,
-        patient_user_id: patientId,
-        params: {},
-        ...configForm,
-      });
+      if (isEditMode && editingAssignmentId && loadedConfigId) {
+        await updateAssignmentConfigParams(loadedConfigId, {
+          num_series: configForm.num_series,
+          num_reps: configForm.num_reps,
+          descanso_rep: configForm.descanso_rep,
+          descanso_serie: configForm.descanso_serie,
+          lado_ativo: configForm.lado_ativo,
+          meta_extensao: configForm.meta_extensao,
+          repouso_max: configForm.repouso_max,
+          limite_tronco: configForm.limite_tronco,
+          tolerancia: configForm.tolerancia,
+        });
 
-      const asg = await createAssignment({
-        patient_user_id: patientId,
-        exercise_id: selectedExerciseId,
-        config_id: cfg.id,
-        schedule,
-        active,
-      });
+        await updateAssignment(editingAssignmentId, {
+          schedule,
+          active,
+          config_id: loadedConfigId,
+        });
 
-      setSuccess(`Prescrição criada com sucesso (assignment id=${asg.id}).`);
+        setSuccess("Prescrição atualizada com sucesso.");
+      } else {
+        const cfg = await createAssignmentConfig({
+          exercise_id: selectedExerciseId,
+          patient_user_id: patientId,
+          params: {},
+          ...configForm,
+        });
+
+        const asg = await createAssignment({
+          patient_user_id: patientId,
+          exercise_id: selectedExerciseId,
+          config_id: cfg.id,
+          schedule,
+          active,
+        });
+
+        setSuccess(`Prescrição criada com sucesso (assignment id=${asg.id}).`);
+      }
     } catch (err: any) {
-      setError(err?.message || "Erro ao criar prescrição.");
+      setError(err?.message || (isEditMode ? "Erro ao atualizar prescrição." : "Erro ao criar prescrição."));
     } finally {
       setSaving(false);
     }
   };
+
+  const [searchParams] = useSearchParams();
+  const assignmentIdParam = searchParams.get("assignmentId");
+  const editingAssignmentId = assignmentIdParam ? Number(assignmentIdParam) : null;
+  const isEditMode = Number.isFinite(editingAssignmentId);
+
+  const [loadingAssignment, setLoadingAssignment] = useState(false);
+  const [loadedConfigId, setLoadedConfigId] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function loadAssignmentForEdit() {
+      if (!isPro || !isEditMode || !editingAssignmentId) return;
+
+      setLoadingAssignment(true);
+      setError(null);
+
+      try {
+        const assignment = await apiFetch<Assignment>(`/v1/assignments/${editingAssignmentId}`);
+
+        setSelectedExerciseId(assignment.exercise_id);
+        setSchedule(assignment.schedule);
+        setActive(assignment.active);
+        setLoadedConfigId(assignment.config_id);
+
+        const configs = await apiFetch<AssignmentConfigResponse[]>(
+          `/v1/exercise-configs?patient_user_id=${assignment.patient_user_id}&exercise_id=${assignment.exercise_id}`
+        );
+
+        const cfg =
+          configs.find((item) => item.id === assignment.config_id) ||
+          configs[0] ||
+          null;
+
+        if (cfg) {
+          setConfigForm({
+            num_series: cfg.num_series ?? 3,
+            num_reps: cfg.num_reps ?? 5,
+            descanso_rep: cfg.descanso_rep ?? 3,
+            descanso_serie: cfg.descanso_serie ?? 30,
+            lado_ativo: cfg.lado_ativo ?? "Perna direita",
+            meta_extensao: cfg.meta_extensao ?? 145,
+            repouso_max: cfg.repouso_max ?? 110,
+            limite_tronco: cfg.limite_tronco ?? 15,
+            tolerancia: cfg.tolerancia ?? 5,
+          });
+        }
+      } catch (err: any) {
+        setError(err?.message || "Erro ao carregar prescrição para edição.");
+      } finally {
+        setLoadingAssignment(false);
+      }
+    }
+
+    loadAssignmentForEdit();
+  }, [isPro, isEditMode, editingAssignmentId]);
 
   if (!isPro) {
     return (
@@ -183,7 +294,11 @@ export default function PrescribeExercisePage() {
                 Voltar para o paciente
               </Link>
 
-              <h1 className="mt-2 text-lg font-semibold tracking-tight">Prescrever exercício</h1>
+              <h1 className="mt-2 text-lg font-semibold tracking-tight">
+                {isEditMode
+                  ? `Editar prescrição • ${translateExerciseName(selectedExercise?.analysis_kind, selectedExercise?.title)}`
+                  : uiLabels.pageTitle}
+              </h1>
               <p className="mt-1 text-xs text-muted-foreground">
                 Paciente: {patient ? `${patient.name} • ${patient.email}` : "Carregando..."}
               </p>
@@ -247,12 +362,16 @@ export default function PrescribeExercisePage() {
                     return (
                       <button
                         key={ex.id}
-                        onClick={() => setSelectedExerciseId(ex.id)}
+                        onClick={() => {
+                          if (isEditMode) return;
+                          setSelectedExerciseId(ex.id);
+                        }}
                         className={
                           "w-full rounded-2xl border px-4 py-3 text-left transition " +
                           (selected
                             ? "border-primary bg-primary/5"
-                            : "border-border/60 bg-background/60 hover:bg-background/80")
+                            : "border-border/60 bg-background/60 hover:bg-background/80") +
+                          (isEditMode ? " cursor-default" : "")
                         }
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -284,21 +403,32 @@ export default function PrescribeExercisePage() {
 
           <div className="rounded-2xl border border-border/60 bg-card/80 shadow-sm backdrop-blur overflow-hidden">
             <div className="px-5 py-4 border-b border-border/60">
-              <h2 className="text-sm font-semibold tracking-tight">2 - Configurar & criar</h2>
-              <p className="mt-1 text-xs text-muted-foreground">Defina a configuração clínica e crie a prescrição.</p>
+              <h2 className="text-sm font-semibold tracking-tight">
+                {isEditMode ? "2 - Configurar e atualizar" : "2 - Configurar e criar"}
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {isEditMode
+                  ? `Atualize os parâmetros de ${translateExerciseName(selectedExercise?.analysis_kind, selectedExercise?.title).toLowerCase()}.`
+                  : `Defina os parâmetros de ${translateExerciseName(selectedExercise?.analysis_kind, selectedExercise?.title).toLowerCase()} e crie a prescrição.`}
+              </p>
             </div>
 
             <div className="p-4 grid gap-4">
               <div className="rounded-xl border border-border/60 bg-background/60 p-3">
                 <p className="text-xs text-muted-foreground">Exercício selecionado</p>
                 <p className="mt-1 text-sm font-semibold">
-                  {selectedExercise ? selectedExercise.title : "—"}
+                  {selectedExercise
+                    ? translateExerciseName(selectedExercise.analysis_kind, selectedExercise.title)
+                    : "—"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {selectedExercise?.description || "Selecione um exercício para configurar a prescrição."}
                 </p>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-1.5">
-                  <label className="text-sm font-medium">Séries</label>
+                  <label className="text-sm font-medium">{uiLabels.numSeries}</label>
                   <input
                     type="number"
                     name="num_series"
@@ -309,7 +439,7 @@ export default function PrescribeExercisePage() {
                 </div>
 
                 <div className="grid gap-1.5">
-                  <label className="text-sm font-medium">Repetições por série</label>
+                  <label className="text-sm font-medium">{uiLabels.numReps}</label>
                   <input
                     type="number"
                     name="num_reps"
@@ -320,7 +450,7 @@ export default function PrescribeExercisePage() {
                 </div>
 
                 <div className="grid gap-1.5">
-                  <label className="text-sm font-medium">Descanso repetição (s)</label>
+                  <label className="text-sm font-medium">{uiLabels.descansoRep}</label>
                   <input
                     type="number"
                     name="descanso_rep"
@@ -331,7 +461,7 @@ export default function PrescribeExercisePage() {
                 </div>
 
                 <div className="grid gap-1.5">
-                  <label className="text-sm font-medium">Descanso série (s)</label>
+                  <label className="text-sm font-medium">{uiLabels.descansoSerie}</label>
                   <input
                     type="number"
                     name="descanso_serie"
@@ -342,20 +472,20 @@ export default function PrescribeExercisePage() {
                 </div>
 
                 <div className="grid gap-1.5">
-                  <label className="text-sm font-medium">Lado ativo</label>
+                  <label className="text-sm font-medium">{uiLabels.ladoAtivo}</label>
                   <select
                     name="lado_ativo"
                     value={configForm.lado_ativo}
                     onChange={handleConfigChange}
                     className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
                   >
-                    <option value="Perna direita">Perna direita</option>
-                    <option value="Perna esquerda">Perna esquerda</option>
+                    <option value="Perna direita">Lado direito</option>
+                    <option value="Perna esquerda">Lado esquerdo</option>
                   </select>
                 </div>
 
                 <div className="grid gap-1.5">
-                  <label className="text-sm font-medium">Meta extensão (°)</label>
+                  <label className="text-sm font-medium">{uiLabels.metaExtensao}</label>
                   <input
                     type="number"
                     name="meta_extensao"
@@ -366,7 +496,7 @@ export default function PrescribeExercisePage() {
                 </div>
 
                 <div className="grid gap-1.5">
-                  <label className="text-sm font-medium">Repouso máximo (°)</label>
+                  <label className="text-sm font-medium">{uiLabels.repousoMax}</label>
                   <input
                     type="number"
                     name="repouso_max"
@@ -377,7 +507,7 @@ export default function PrescribeExercisePage() {
                 </div>
 
                 <div className="grid gap-1.5">
-                  <label className="text-sm font-medium">Limite tronco (°)</label>
+                  <label className="text-sm font-medium">{uiLabels.limiteTronco}</label>
                   <input
                     type="number"
                     name="limite_tronco"
@@ -388,7 +518,7 @@ export default function PrescribeExercisePage() {
                 </div>
 
                 <div className="grid gap-1.5 sm:col-span-2">
-                  <label className="text-sm font-medium">Tolerância (%)</label>
+                  <label className="text-sm font-medium">{uiLabels.tolerancia}</label>
                   <input
                     type="number"
                     name="tolerancia"
@@ -401,7 +531,7 @@ export default function PrescribeExercisePage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-1.5">
-                  <label className="text-sm font-medium">Frequência</label>
+                  <label className="text-sm font-medium">{uiLabels.schedule}</label>
                   <select
                     value={schedule}
                     onChange={(e) => setSchedule(e.target.value as any)}
@@ -414,14 +544,14 @@ export default function PrescribeExercisePage() {
                 </div>
 
                 <div className="grid gap-1.5">
-                  <label className="text-sm font-medium">Ativo</label>
+                  <label className="text-sm font-medium">{uiLabels.active}</label>
                   <select
                     value={active ? "true" : "false"}
                     onChange={(e) => setActive(e.target.value === "true")}
                     className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
                   >
-                    <option value="true">Verdadeiro</option>
-                    <option value="false">Falso</option>
+                    <option value="true">{uiLabels.activeTrue}</option>
+                    <option value="false">{uiLabels.activeFalse}</option>
                   </select>
                 </div>
               </div>
@@ -432,7 +562,7 @@ export default function PrescribeExercisePage() {
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground shadow-button hover:opacity-90 transition disabled:opacity-60"
               >
                 <Sparkles className="h-4 w-4" />
-                {saving ? "Criando..." : "Criar prescrição"}
+                {saving ? (isEditMode ? "Salvando..." : "Criando...") : (isEditMode ? "Salvar alterações" : "Criar prescrição")}
               </button>
             </div>
           </div>
@@ -440,4 +570,50 @@ export default function PrescribeExercisePage() {
       </main>
     </div>
   );
+}
+
+function getExerciseUiLabels(analysisKind?: string) {
+  if (analysisKind === "LATERAL_LUNGE_V1") {
+    return {
+      pageTitle: "Prescrever passada lateral",
+      configTitle: "Parâmetros da passada lateral",
+      numSeries: "Séries",
+      numReps: "Repetições por lado",
+      descansoRep: "Descanso entre repetições (s)",
+      descansoSerie: "Descanso entre séries (s)",
+      ladoAtivo: "Lado de referência",
+      metaExtensao: "Meta de abertura (cm)",
+      repousoMax: "Limite máximo de abertura (cm)",
+      limiteTronco: "Limite de compensação do tronco",
+      tolerancia: "Tolerância",
+      schedule: "Frequência",
+      active: "Status da prescrição",
+      activeTrue: "Ativa",
+      activeFalse: "Inativa",
+    };
+  }
+
+  return {
+    pageTitle: "Prescrever exercício",
+    configTitle: "Parâmetros clínicos",
+    numSeries: "Séries",
+    numReps: "Repetições por série",
+    descansoRep: "Descanso repetição (s)",
+    descansoSerie: "Descanso série (s)",
+    ladoAtivo: "Lado ativo",
+    metaExtensao: "Meta de extensão (°)",
+    repousoMax: "Repouso máximo (°)",
+    limiteTronco: "Limite de tronco (°)",
+    tolerancia: "Tolerância (%)",
+    schedule: "Frequência",
+    active: "Status da prescrição",
+    activeTrue: "Ativa",
+    activeFalse: "Inativa",
+  };
+}
+
+function translateExerciseName(analysisKind?: string, fallback?: string) {
+  if (analysisKind === "KNEE_EXTENSION_V1") return "Extensão de joelho";
+  if (analysisKind === "LATERAL_LUNGE_V1") return "Passada lateral";
+  return fallback || "Exercício";
 }

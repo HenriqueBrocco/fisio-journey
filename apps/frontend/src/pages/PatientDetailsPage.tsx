@@ -136,6 +136,49 @@ export default function PatientDetailsPage() {
       .slice(0, 5);
   }, [sessions]);
 
+  const resultsStats = useMemo(() => {
+    const summaries = Object.values(summaryMap);
+
+    const finishedSessions = sessions.filter((s) => s.status === "FINISHED").length;
+
+    if (summaries.length === 0) {
+      return {
+        finishedSessions,
+        averageAccuracy: null as number | null,
+        averageRom: null as number | null,
+        totalAlerts: 0,
+      };
+    }
+
+    const summariesWithAccuracy = summaries.filter(
+      (s) => typeof s.accuracy === "number"
+    );
+
+    const averageAccuracy =
+      summariesWithAccuracy.length > 0
+        ? Math.round(
+          summariesWithAccuracy.reduce((acc, s) => acc + (s.accuracy ?? 0), 0) /
+          summariesWithAccuracy.length
+        )
+        : null;
+
+    const averageRom = Math.round(
+      summaries.reduce((acc, s) => acc + (s.rom ?? 0), 0) / summaries.length
+    );
+
+    const totalAlerts = summaries.reduce(
+      (acc, s) => acc + (Array.isArray(s.alerts) ? s.alerts.length : 0),
+      0
+    );
+
+    return {
+      finishedSessions,
+      averageAccuracy,
+      averageRom,
+      totalAlerts,
+    };
+  }, [sessions, summaryMap]);
+
   if (!isPro) {
     return (
       <div className="min-h-screen bg-[image:var(--gradient-bg)] px-4 py-6 sm:py-8">
@@ -218,10 +261,28 @@ export default function PatientDetailsPage() {
           <div className="rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">Resultados</span>
-              <span className="text-primary text-sm font-semibold">Em breve</span>
+              <span className="text-primary text-sm font-semibold">
+                {loading ? "…" : `${resultsStats.finishedSessions} sessão(ões)`}
+              </span>
             </div>
-            <p className="mt-3 text-3xl font-semibold tracking-tight">—</p>
-            <p className="mt-1 text-xs text-muted-foreground">Quando o backend estabilizar métricas</p>
+
+            <p className="mt-3 text-3xl font-semibold tracking-tight">
+              {loading ? "…" : resultsStats.averageAccuracy != null ? `${resultsStats.averageAccuracy}%` : "—"}
+            </p>
+
+            <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
+              <p>
+                <strong>Acurácia média:</strong>{" "}
+                {resultsStats.averageAccuracy != null ? `${resultsStats.averageAccuracy}%` : "—"}
+              </p>
+              <p>
+                <strong>Amplitude média:</strong>{" "}
+                {resultsStats.averageRom != null ? `${resultsStats.averageRom}°` : "—"}
+              </p>
+              <p>
+                <strong>Total de alertas:</strong> {resultsStats.totalAlerts}
+              </p>
+            </div>
           </div>
         </section>
 
@@ -279,7 +340,12 @@ export default function PatientDetailsPage() {
                 <p className="mt-1 text-xs text-muted-foreground">Sessões registradas do paciente.</p>
               </div>
 
-              <span className="text-xs text-muted-foreground">Em breve</span>
+              <Link
+                to={`/patients/${patientId}/sessions`}
+                className="text-xs font-medium text-primary hover:opacity-80"
+              >
+                Ver todas
+              </Link>
             </div>
 
             <div className="p-3">

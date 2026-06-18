@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { useTheme } from "@/hooks/useTheme";
 import { Calendar, ClipboardList, LogOut, Moon, Sparkles, Sun } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 type Assignment = {
   id: number;
@@ -151,6 +151,12 @@ export default function UserDashboard() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <Link
+            to="/about"
+            className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-medium hover:bg-muted/50 transition"
+          >
+            Sobre
+          </Link>
           <button
             onClick={toggle}
             className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-medium hover:bg-muted/50 transition"

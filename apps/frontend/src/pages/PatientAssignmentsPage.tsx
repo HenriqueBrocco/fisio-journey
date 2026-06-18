@@ -18,7 +18,7 @@ type Assignment = {
   config_id: number;
   schedule: string;
   active: boolean;
-  created_at?: string;
+  created_at: string;
 };
 
 export default function PatientAssignmentsPage() {
@@ -45,7 +45,9 @@ export default function PatientAssignmentsPage() {
       setAssignments(Array.isArray(a) ? a : []);
 
       const map: Record<number, Exercise> = {};
-      (Array.isArray(e) ? e : []).forEach((ex) => (map[ex.id] = ex));
+      (Array.isArray(e) ? e : []).forEach((ex) => {
+        map[ex.id] = ex;
+      });
       setExerciseMap(map);
     } catch (err: any) {
       setError(err?.message || "Erro ao carregar prescrições.");
@@ -88,7 +90,6 @@ export default function PatientAssignmentsPage() {
   return (
     <div className="min-h-screen bg-[image:var(--gradient-bg)] px-4 py-6 sm:py-8">
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        {/* Header */}
         <section className="rounded-2xl border border-border/60 bg-card/80 p-5 shadow-sm backdrop-blur">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -99,8 +100,11 @@ export default function PatientAssignmentsPage() {
                 <ArrowLeft className="h-4 w-4" />
                 Voltar para o paciente
               </Link>
+
               <h1 className="mt-2 text-lg font-semibold tracking-tight">Prescrições</h1>
-              <p className="mt-1 text-xs text-muted-foreground break-all">Paciente: {patientId}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Visualize e gerencie os exercícios prescritos para este paciente.
+              </p>
             </div>
 
             <button
@@ -120,15 +124,15 @@ export default function PatientAssignmentsPage() {
           )}
         </section>
 
-        {/* List */}
         <section className="rounded-2xl border border-border/60 bg-card/80 shadow-sm backdrop-blur overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
             <div className="flex items-center gap-2">
               <ClipboardList className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold tracking-tight">Assignments</h2>
+              <h2 className="text-sm font-semibold tracking-tight">Lista de prescrições</h2>
             </div>
+
             <span className="text-xs text-muted-foreground">
-              {loading ? "…" : `${sorted.length} item(s)`}
+              {loading ? "…" : `${sorted.length} prescrição(ões)`}
             </span>
           </div>
 
@@ -136,12 +140,15 @@ export default function PatientAssignmentsPage() {
             {loading ? (
               <div className="p-4 text-sm text-muted-foreground">Carregando...</div>
             ) : sorted.length === 0 ? (
-              <div className="p-4 text-sm text-muted-foreground">Nenhuma prescrição encontrada.</div>
+              <div className="p-4 text-sm text-muted-foreground">
+                Nenhuma prescrição encontrada.
+              </div>
             ) : (
               <div className="grid gap-3">
                 {sorted.map((a) => {
                   const ex = exerciseMap[a.exercise_id];
                   const title = ex?.title || `Exercício #${a.exercise_id}`;
+
                   return (
                     <div
                       key={a.id}
@@ -150,23 +157,42 @@ export default function PatientAssignmentsPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold">{title}</p>
+
                           <p className="mt-1 text-xs text-muted-foreground">
-                            freq: {a.schedule} • config #{a.config_id}
-                            {ex?.analysis_kind ? ` • ${ex.analysis_kind}` : ""}
-                            {ex?.body_focus ? ` • ${ex.body_focus}` : ""}
+                            {translateAssignmentStatus(a.active)} • Frequência:{" "}
+                            {translateSchedule(a.schedule)}
+                          </p>
+
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Configuração clínica vinculada
+                            {ex?.analysis_kind ? ` • Análise: ${translateAnalysisKind(ex.analysis_kind)}` : ""}
+                            {ex?.body_focus ? ` • Foco: ${translateBodyFocus(ex.body_focus)}` : ""}
+                          </p>
+
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Criada em: {formatDate(a.created_at)}
                           </p>
                         </div>
 
-                        <span
-                          className={
-                            "shrink-0 rounded-full px-3 py-1 text-xs font-medium " +
-                            (a.active
-                              ? "bg-emerald-500/10 text-emerald-500"
-                              : "bg-rose-500/10 text-rose-500")
-                          }
-                        >
-                          {a.active ? "Ativo" : "Inativo"}
-                        </span>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Link
+                            to={`/patients/${patientId}/prescribe?assignmentId=${a.id}`}
+                            className="rounded-xl border px-3 py-1.5 text-xs font-medium hover:bg-muted/50 transition"
+                          >
+                            Editar
+                          </Link>
+
+                          <span
+                            className={
+                              "rounded-full px-3 py-1 text-xs font-medium " +
+                              (a.active
+                                ? "bg-emerald-500/10 text-emerald-600"
+                                : "bg-rose-500/10 text-rose-600")
+                            }
+                          >
+                            {a.active ? "Ativa" : "Inativa"}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -174,12 +200,42 @@ export default function PatientAssignmentsPage() {
               </div>
             )}
           </div>
-
-          <div className="px-5 py-4 border-t border-border/60 text-xs text-muted-foreground">
-            Próximo upgrade: botões “Ativar/Desativar” e “Editar frequência”, se você tiver endpoints de update.
-          </div>
         </section>
       </main>
     </div>
   );
+}
+
+function translateSchedule(schedule?: string) {
+  if (schedule === "DAILY") return "Diária";
+  if (schedule === "WEEKLY") return "Semanal";
+  if (schedule === "MONTHLY") return "Mensal";
+  return schedule || "—";
+}
+
+function translateAssignmentStatus(active?: boolean) {
+  if (active === true) return "Prescrição ativa";
+  if (active === false) return "Prescrição inativa";
+  return "Status indisponível";
+}
+
+function translateAnalysisKind(kind?: string) {
+  if (kind === "KNEE_EXTENSION_V1") return "Extensão de joelho";
+  if (kind === "LATERAL_LUNGE_V1") return "Passada lateral";
+  return kind || "—";
+}
+
+function translateBodyFocus(bodyFocus?: string) {
+  if (bodyFocus === "LOWER_LIMBS") return "Membros inferiores";
+  if (bodyFocus === "KNEE") return "Joelho";
+  return bodyFocus || "—";
+}
+
+function formatDate(iso?: string) {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("pt-BR");
+  } catch {
+    return iso;
+  }
 }

@@ -236,6 +236,8 @@ export default function PassadaLateral({
         }>
     >([]);
 
+    const [showIntroModal, setShowIntroModal] = useState(true);
+
     // ========================================================
     // 2. FUNÇÃO CENTRAL DE PONTUAÇÃO
     // ========================================================
@@ -523,7 +525,6 @@ export default function PassadaLateral({
 
     return (
         <div style={{ width: '100vw', height: '100vh', position: 'relative', backgroundColor: '#1a1a1a', overflow: 'hidden' }}>
-
             {/* BACKGROUND (UNITY) */}
             <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}>
                 <Unity unityProvider={unityProvider} style={{ width: '100%', height: '100%' }} />
@@ -629,6 +630,18 @@ export default function PassadaLateral({
                         <div style={{ width: `${Math.min(progressoInicio, 100)}%`, height: '100%', backgroundColor: '#67B5A2', transition: 'width 0.1s linear' }} />
                     </div>
                     <button onClick={() => setExercicioIniciado(true)} style={{ marginTop: '30px', padding: '10px 25px', backgroundColor: 'transparent', color: 'white', border: '1px solid #888', borderRadius: '6px', cursor: 'pointer' }}>Ou... Clique aqui para iniciar!</button>
+
+                    <div style={{marginTop: "20px", borderRadius: "16px", backgroundColor: "#444", border: "1px solid #000000", padding: "16px"}}>
+                        <h3 style={{ margin: 0, fontSize: "1.5rem", color: "white" }}>Orientações:</h3>
+                        <div style={{ marginTop: "10px", color: "white", fontSize: "1.2rem", lineHeight: 1.55 }}>
+                            <h3 style={{ margin: "4px 0", backgroundColor: 'transparent' }}>• Mantenha o tronco estável durante o movimento.</h3>
+                            <h3 style={{ margin: "4px 0", backgroundColor: 'transparent' }}>• Execute a passada com controle e retorno ao centro.</h3>
+                            <h3 style={{ margin: "4px 0", backgroundColor: 'transparent' }}>• Permaneça visível para a câmera durante toda a sessão.</h3>
+                            <h3 style={{ margin: "4px 0", backgroundColor: 'transparent' }}>• Interrompa o exercício em caso de dor ou desconforto.</h3>
+                            <h3 style={{ margin: "4px 0", backgroundColor: 'transparent' }}>• Levantar a mão direita durante o exercício aciona a pausa, permitindo interromper a atividade com segurança.</h3>
+                            <h3 style={{ margin: "4px 0", backgroundColor: 'transparent' }}>• As imagens captadas pela câmera são utilizadas apenas para análise do movimento durante a sessão e não são armazenadas pela plataforma.</h3>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -826,6 +839,26 @@ export default function PassadaLateral({
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+function InfoBox({ label, value }: { label: string; value: string }) {
+    return (
+        <div
+            style={{
+                border: "1px solid #e5e7eb",
+                borderRadius: "14px",
+                padding: "14px",
+                backgroundColor: "#f9fafb",
+            }}
+        >
+            <div style={{ fontSize: "0.78rem", color: "#6b7280", fontWeight: 600 }}>
+                {label}
+            </div>
+            <div style={{ marginTop: "6px", fontSize: "1rem", color: "#111827", fontWeight: 700 }}>
+                {value}
+            </div>
         </div>
     );
 }

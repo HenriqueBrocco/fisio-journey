@@ -68,3 +68,39 @@ export function createAssignment(payload: CreateAssignmentRequest) {
     body: JSON.stringify(payload),
   });
 }
+
+export async function updateAssignment(
+  assignmentId: number,
+  payload: {
+    schedule: "DAILY" | "WEEKLY" | "MONTHLY";
+    active: boolean;
+    config_id: number;
+  }
+) {
+  return apiFetch(`/v1/assignments/${assignmentId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAssignmentConfigParams(
+  configId: number,
+  payload: {
+    num_series: number;
+    num_reps: number;
+    descanso_rep: number;
+    descanso_serie: number;
+    lado_ativo: string;
+    meta_extensao: number;
+    repouso_max: number;
+    limite_tronco: number;
+    tolerancia: number;
+  }
+) {
+  return apiFetch(`/v1/exercise-configs/${configId}/params`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
