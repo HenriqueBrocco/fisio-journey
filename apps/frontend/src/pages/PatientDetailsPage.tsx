@@ -28,6 +28,15 @@ type Session = {
   created_at?: string;
 };
 
+type SessionSummary = {
+  session_id: string;
+  reps: number;
+  rom: number;
+  cadence: number | null;
+  alerts: string[];
+  accuracy?: number | null;
+};
+
 type Exercise = {
   id: number;
   title: string;
@@ -45,6 +54,7 @@ export default function PatientDetailsPage() {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [summaryMap, setSummaryMap] = useState<Record<string, SessionSummary>>({});
   const [exerciseMap, setExerciseMap] = useState<Record<number, Exercise>>({});
 
   const [loading, setLoading] = useState(true);
@@ -64,12 +74,33 @@ export default function PatientDetailsPage() {
       ]);
 
       const map: Record<number, Exercise> = {};
-      (Array.isArray(e) ? e : []).forEach((ex) => (map[ex.id] = ex));
+      (Array.isArray(e) ? e : []).forEach((ex) => {
+        map[ex.id] = ex;
+      });
       setExerciseMap(map);
 
+      const sessionList = Array.isArray(s) ? s : [];
+
+      const summaryEntries = await Promise.all(
+        sessionList.map(async (sess) => {
+          try {
+            const summary = await apiFetch<SessionSummary>(`/v1/sessions/${sess.id}/summary`);
+            return [sess.id, summary] as const;
+          } catch {
+            return [sess.id, null] as const;
+          }
+        })
+      );
+
+      const sMap: Record<string, SessionSummary> = {};
+      summaryEntries.forEach(([sessionId, summary]) => {
+        if (summary) sMap[sessionId] = summary;
+      });
+
+      setSummaryMap(sMap);
       setPatient(p);
       setAssignments(Array.isArray(a) ? a : []);
-      setSessions(Array.isArray(s) ? s : []);
+      setSessions(sessionList);
     } catch (err: any) {
       setError(err?.message || "Erro ao carregar dados do paciente.");
     } finally {
@@ -88,7 +119,21 @@ export default function PatientDetailsPage() {
   }, [assignments]);
 
   const recentSessions = useMemo(() => {
-    return [...sessions].slice(0, 5);
+    return [...sessions]
+      .sort((a, b) => {
+        const ta = a.finished_at
+          ? new Date(a.finished_at).getTime()
+          : a.created_at
+            ? new Date(a.created_at).getTime()
+            : 0;
+        const tb = b.finished_at
+          ? new Date(b.finished_at).getTime()
+          : b.created_at
+            ? new Date(b.created_at).getTime()
+            : 0;
+        return tb - ta;
+      })
+      .slice(0, 5);
   }, [sessions]);
 
   if (!isPro) {
@@ -107,7 +152,6 @@ export default function PatientDetailsPage() {
   return (
     <div className="min-h-screen bg-[image:var(--gradient-bg)] px-4 py-6 sm:py-8">
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        {/* Header */}
         <section className="rounded-2xl border border-border/60 bg-card/80 p-5 shadow-sm backdrop-blur">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -152,7 +196,6 @@ export default function PatientDetailsPage() {
           )}
         </section>
 
-        {/* Cards */}
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur">
             <div className="flex items-center justify-between">
@@ -182,9 +225,7 @@ export default function PatientDetailsPage() {
           </div>
         </section>
 
-        {/* Panels */}
         <section className="grid gap-4 lg:grid-cols-2">
-          {/* Prescrições */}
           <div className="rounded-2xl border border-border/60 bg-card/80 shadow-sm backdrop-blur overflow-hidden">
             <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border/60">
               <div>
@@ -192,7 +233,10 @@ export default function PatientDetailsPage() {
                 <p className="mt-1 text-xs text-muted-foreground">Exercícios atribuídos ao paciente.</p>
               </div>
 
-              <Link to={`/patients/${patientId}/assignments`} className="text-xs font-medium text-primary hover:opacity-80">
+              <Link
+                to={`/patients/${patientId}/assignments`}
+                className="text-xs font-medium text-primary hover:opacity-80"
+              >
                 Ver todas
               </Link>
             </div>
@@ -206,7 +250,10 @@ export default function PatientDetailsPage() {
                 <div className="grid gap-3">
                   {recentAssignments.map((a) => {
                     const exTitle =
-                      a.exercise_id != null ? (exerciseMap[a.exercise_id]?.title || `Exercício #${a.exercise_id}`) : "—";
+                      a.exercise_id != null
+                        ? exerciseMap[a.exercise_id]?.title || `Exercício #${a.exercise_id}`
+                        : "—";
+
                     return (
                       <div
                         key={String(a.id)}
@@ -215,7 +262,7 @@ export default function PatientDetailsPage() {
                         <p className="text-sm font-semibold">{exTitle}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           Status: {a.active === true ? "Ativa" : a.active === false ? "Inativa" : "—"}
-                          {a.schedule === "DAILY"? ` • Frequência: Diário` : a.schedule === "WEEKLY"? ` • Frequência: Semanal` : ` • Frequência: Mensal`}
+                          {a.schedule ? ` • Frequência: ${translateSchedule(a.schedule)}` : ""}
                         </p>
                       </div>
                     );
@@ -225,7 +272,6 @@ export default function PatientDetailsPage() {
             </div>
           </div>
 
-          {/* Sessões */}
           <div className="rounded-2xl border border-border/60 bg-card/80 shadow-sm backdrop-blur overflow-hidden">
             <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border/60">
               <div>
@@ -233,7 +279,6 @@ export default function PatientDetailsPage() {
                 <p className="mt-1 text-xs text-muted-foreground">Sessões registradas do paciente.</p>
               </div>
 
-              {/* Você ainda não tem rota de lista completa de sessões por paciente, então fica em breve */}
               <span className="text-xs text-muted-foreground">Em breve</span>
             </div>
 
@@ -246,7 +291,12 @@ export default function PatientDetailsPage() {
                 <div className="grid gap-3">
                   {recentSessions.map((s) => {
                     const exTitle =
-                      s.exercise_id != null ? (exerciseMap[s.exercise_id]?.title || `Exercício #${s.exercise_id}`) : "—";
+                      s.exercise_id != null
+                        ? exerciseMap[s.exercise_id]?.title || `Exercício #${s.exercise_id}`
+                        : "—";
+
+                    const summary = summaryMap[s.id];
+
                     return (
                       <div
                         key={s.id}
@@ -256,13 +306,32 @@ export default function PatientDetailsPage() {
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold">{exTitle}</p>
                             <p className="mt-1 text-xs text-muted-foreground">
-                              {s.status ? `Status: ${s.status}` : "Status: —"}
-                              {s.created_at ? ` • Criada: ${formatDate(s.created_at)}` : ""}
+                              Status: {translateSessionStatus(s.status)}
+                              {s.finished_at
+                                ? ` • Finalizada: ${formatDate(s.finished_at)}`
+                                : s.created_at
+                                  ? ` • Criada: ${formatDate(s.created_at)}`
+                                  : ""}
                             </p>
+
+                            {summary ? (
+                              <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
+                                <p><strong>Repetições:</strong> {summary.reps}</p>
+                                <p><strong>Amplitude:</strong> {summary.rom}°</p>
+                                <p><strong>Cadência:</strong> {summary.cadence ?? "—"}</p>
+                                <p><strong>Acurácia:</strong> {summary.accuracy ?? "—"}%</p>
+                                <p>
+                                  <strong>Alertas:</strong>{" "}
+                                  {summary.alerts?.length ? summary.alerts.join(", ") : "Nenhum"}
+                                </p>
+                              </div>
+                            ) : (
+                              <p className="mt-3 text-xs text-muted-foreground">Resumo indisponível.</p>
+                            )}
                           </div>
 
                           <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-                            {s.status || "—"}
+                            {translateSessionStatus(s.status)}
                           </span>
                         </div>
                       </div>
@@ -278,9 +347,23 @@ export default function PatientDetailsPage() {
   );
 }
 
+function translateSchedule(schedule: string) {
+  if (schedule === "DAILY") return "Diário";
+  if (schedule === "WEEKLY") return "Semanal";
+  if (schedule === "MONTHLY") return "Mensal";
+  return schedule;
+}
+
+function translateSessionStatus(status?: string) {
+  if (status === "CREATED") return "Pendente";
+  if (status === "RUNNING") return "Em andamento";
+  if (status === "FINISHED") return "Concluída";
+  return status || "—";
+}
+
 function formatDate(iso: string) {
   try {
-    return new Date(iso).toLocaleString();
+    return new Date(iso).toLocaleString("pt-BR");
   } catch {
     return iso;
   }

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session as DBSession
 from app.models.session import Session as SessionModel
 from app.models.session import SessionSummary as SessionSummaryModel
 from app.models.user import User
+from app.services.achievements_rules_service import evaluate_finished_session_achievements
 
 
 class SessionAccessError(Exception):
@@ -39,11 +40,11 @@ def get_session(db: DBSession, session_id: str) -> SessionModel:
 
 def start_session(db: DBSession, user: User, session_id: str) -> SessionModel:
     s = get_session(db, session_id)
-    ensure_session_access(user, s)
+    ensure_session_access(user, s, db)
 
     if s.status == "CREATED":
         s.status = "RUNNING"
-        s.started_at = datetime(timezone=True).now(timezone.utc)
+        s.started_at = datetime.now(timezone.utc)
 
     db.add(s)
     db.commit()
@@ -53,12 +54,13 @@ def start_session(db: DBSession, user: User, session_id: str) -> SessionModel:
 
 def finish_session(db: DBSession, user: User, session_id: str) -> SessionModel:
     s = get_session(db, session_id)
-    ensure_session_access(user, s)
+    ensure_session_access(user, s, db)
 
     if s.status != "FINISHED":
         s.status = "FINISHED"
-        s.finished_at = datetime(timezone=True).now(timezone.utc)
+        s.finished_at = datetime.now(timezone.utc)
 
+    evaluate_finished_session_achievements(db, user.id)
     db.add(s)
     db.commit()
     db.refresh(s)
@@ -75,7 +77,7 @@ def upsert_summary(
     alerts: list,
 ) -> SessionSummaryModel:
     s = get_session(db, session_id)
-    ensure_session_access(user, s)
+    ensure_session_access(user, s, db)
 
     summary = db.execute(
         select(SessionSummaryModel).where(SessionSummaryModel.session_id == session_id)
@@ -103,7 +105,7 @@ def upsert_summary(
 
 def get_summary(db: DBSession, user: User, session_id: str) -> SessionSummaryModel:
     s = get_session(db, session_id)
-    ensure_session_access(user, s)
+    ensure_session_access(user, s, db)
 
     summary = db.execute(
         select(SessionSummaryModel).where(SessionSummaryModel.session_id == session_id)
@@ -111,7 +113,6 @@ def get_summary(db: DBSession, user: User, session_id: str) -> SessionSummaryMod
     if not summary:
         raise SessionNotFoundError("Resumo não encontrado.")
     return summary
-
 
 def finalize_session(
     db: DBSession,
@@ -121,18 +122,24 @@ def finalize_session(
     rom: float | None,
     cadence: float | None,
     alerts: list | None,
-) -> SessionModel:
+    accuracy: int | None,
+) -> dict:
     s = get_session(db, session_id)
-    ensure_session_access(user, s)
+    ensure_session_access(user, s, db)
+
+    summary = db.execute(
+        select(SessionSummaryModel).where(SessionSummaryModel.session_id == session_id)
+    ).scalar_one_or_none()
 
     has_any = any(v is not None for v in [reps, rom, cadence, alerts])
     if has_any:
-        summary = db.execute(
-            select(SessionSummaryModel).where(SessionSummaryModel.session_id == session_id)
-        ).scalar_one_or_none()
         if not summary:
             summary = SessionSummaryModel(
-                session_id=session_id, reps=0, rom=0.0, cadence=None, alerts=[]
+                session_id=session_id,
+                reps=0,
+                rom=0.0,
+                cadence=None,
+                alerts=[],
             )
             db.add(summary)
 
@@ -144,12 +151,24 @@ def finalize_session(
             summary.cadence = cadence
         if alerts is not None:
             summary.alerts = alerts
+        if accuracy is not None:
+            summary.accuracy = accuracy
 
     if s.status != "FINISHED":
         s.status = "FINISHED"
-        s.finished_at = datetime(timezone=True).now(timezone.utc)
+        s.finished_at = datetime.now(timezone.utc)
+
+    new_achievements = evaluate_finished_session_achievements(db, s.patient_user_id)
 
     db.add(s)
     db.commit()
     db.refresh(s)
-    return s
+
+    if summary:
+        db.refresh(summary)
+
+    return {
+        "session": s,
+        "summary": summary,
+        "new_achievements": new_achievements,
+    }

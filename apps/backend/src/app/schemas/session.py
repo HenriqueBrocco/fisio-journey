@@ -28,6 +28,7 @@ class SessionSummaryIn(BaseModel):
     rom: float = 0.0  # no seu model está Integer, mas vamos tratar como float no schema
     cadence: float | None = None
     alerts: list = Field(default_factory=list)
+    accuracy: int | None = None
 
 
 class SessionSummaryOut(BaseModel):
@@ -37,7 +38,8 @@ class SessionSummaryOut(BaseModel):
     reps: int
     rom: float
     cadence: float | None = None
-    alerts: list
+    alerts: list = []
+    accuracy: int | None = None
     created_at: datetime
 
 
@@ -46,3 +48,18 @@ class SessionFinalizeIn(BaseModel):
     rom: float | None = None
     cadence: float | None = None
     alerts: list[Any] | None = None
+    accuracy: int | None = None
+
+
+class AchievementUnlockedOut(BaseModel):
+    code: str
+    name: str
+    description: str
+    icon: str | None = None
+    points: int
+
+
+class SessionFinalizeOut(BaseModel):
+    session: SessionOut
+    summary: SessionSummaryOut | None = None
+    new_achievements: list[AchievementUnlockedOut] = []

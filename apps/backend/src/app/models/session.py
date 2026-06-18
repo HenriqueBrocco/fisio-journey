@@ -30,4 +30,5 @@ class SessionSummary(Base):
     rom: Mapped[float] = mapped_column(Float, default=0.0)
     cadence: Mapped[float | None] = mapped_column(Float, nullable=True)
     alerts: Mapped[list] = mapped_column(JSON, default=list)
+    accuracy: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))

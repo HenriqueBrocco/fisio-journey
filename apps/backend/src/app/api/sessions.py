@@ -32,6 +32,13 @@ from app.services.sessions_service import (
 from app.services.sessions_service import (
     upsert_summary as svc_upsert_summary,
 )
+from app.schemas.session import (
+    SessionFinalizeIn,
+    SessionFinalizeOut,
+    SessionOut,
+    SessionSummaryIn,
+    SessionSummaryOut,
+)
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -123,7 +130,7 @@ def get_session_summary(
         raise HTTPException(status_code=403, detail=str(e))
 
 
-@router.post("/{session_id}/finalize", response_model=SessionOut)
+@router.post("/{session_id}/finalize", response_model=SessionFinalizeOut)
 def finalize_session(
     session_id: str,
     payload: SessionFinalizeIn,
@@ -139,6 +146,7 @@ def finalize_session(
             rom=payload.rom,
             cadence=payload.cadence,
             alerts=payload.alerts,
+            accuracy=payload.accuracy,
         )
     except SessionNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
