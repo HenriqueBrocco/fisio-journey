@@ -221,7 +221,7 @@ function translateAssignmentStatus(active?: boolean) {
 
 function translateAnalysisKind(kind?: string) {
   if (kind === "KNEE_EXTENSION_V1") return "Extensão de joelho";
-  if (kind === "LATERAL_LUNGE_V1") return "Passada lateral";
+  if (kind === "LATERAL_LUNGE_V1") return "Marcha lateral";
   return kind || "—";
 }
 

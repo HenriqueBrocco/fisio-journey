@@ -575,8 +575,8 @@ export default function PrescribeExercisePage() {
 function getExerciseUiLabels(analysisKind?: string) {
   if (analysisKind === "LATERAL_LUNGE_V1") {
     return {
-      pageTitle: "Prescrever passada lateral",
-      configTitle: "Parâmetros da passada lateral",
+      pageTitle: "Prescrever marcha lateral",
+      configTitle: "Parâmetros da marcha lateral",
       numSeries: "Séries",
       numReps: "Repetições por lado",
       descansoRep: "Descanso entre repetições (s)",
@@ -614,6 +614,6 @@ function getExerciseUiLabels(analysisKind?: string) {
 
 function translateExerciseName(analysisKind?: string, fallback?: string) {
   if (analysisKind === "KNEE_EXTENSION_V1") return "Extensão de joelho";
-  if (analysisKind === "LATERAL_LUNGE_V1") return "Passada lateral";
+  if (analysisKind === "LATERAL_LUNGE_V1") return "Marcha lateral";
   return fallback || "Exercício";
 }

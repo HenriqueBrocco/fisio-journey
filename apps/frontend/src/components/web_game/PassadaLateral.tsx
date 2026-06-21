@@ -135,7 +135,7 @@ export default function PassadaLateral({
                     limiteAbertura: cfg.repouso_max ?? prev.limiteAbertura,
                 }));
             } catch (error) {
-                console.error("Erro ao carregar config clínica da passada lateral:", error);
+                console.error("Erro ao carregar config clínica da marcha lateral:", error);
             }
         }
 
@@ -635,7 +635,7 @@ export default function PassadaLateral({
                         <h3 style={{ margin: 0, fontSize: "1.5rem", color: "white" }}>Orientações:</h3>
                         <div style={{ marginTop: "10px", color: "white", fontSize: "1.2rem", lineHeight: 1.55 }}>
                             <h3 style={{ margin: "4px 0", backgroundColor: 'transparent' }}>• Mantenha o tronco estável durante o movimento.</h3>
-                            <h3 style={{ margin: "4px 0", backgroundColor: 'transparent' }}>• Execute a passada com controle e retorno ao centro.</h3>
+                            <h3 style={{ margin: "4px 0", backgroundColor: 'transparent' }}>• Execute a marcha com controle e retorno ao centro.</h3>
                             <h3 style={{ margin: "4px 0", backgroundColor: 'transparent' }}>• Permaneça visível para a câmera durante toda a sessão.</h3>
                             <h3 style={{ margin: "4px 0", backgroundColor: 'transparent' }}>• Interrompa o exercício em caso de dor ou desconforto.</h3>
                             <h3 style={{ margin: "4px 0", backgroundColor: 'transparent' }}>• Levantar a mão direita durante o exercício aciona a pausa, permitindo interromper a atividade com segurança.</h3>
