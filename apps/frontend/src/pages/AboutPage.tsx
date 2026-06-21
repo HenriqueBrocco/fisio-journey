@@ -97,8 +97,9 @@ export default function AboutPage() {
         <section className="rounded-2xl border border-border/60 bg-card/80 p-5 shadow-sm backdrop-blur">
           <h2 className="text-sm font-semibold tracking-tight">Projeto</h2>
           <p className="mt-3 text-sm text-muted-foreground">
-            Projeto acadêmico desenvolvido como Trabalho de Conclusão de Curso, unindo saúde,
-            tecnologia, visão computacional, web e gamificação em uma proposta de apoio à
+            Projeto acadêmico desenvolvido como Trabalho de Conclusão de Curso de Engenharia de Computação, dos alunos
+            Amanda Veiga de Moura, Bernardo Rezende Santos Pereira, Henrique Brocco Marra, Lucas Diniz de Moraes e Matheus Crivellari Bueno Jorge.
+            Que une saúde, tecnologia, visão computacional, web e gamificação em uma proposta de apoio à
             fisioterapia.
           </p>
         </section>
