@@ -37,6 +37,14 @@ type FinalizeSessionResponse = {
   finished_at?: string | null;
 };
 
+// Nova tipagem analítica de performance
+type SerieHistory = {
+  serie: number;
+  corretas: number;
+  errosExecucao: number;
+  errosTronco: number;
+};
+
 export const MocapCamera = ({
   sessionId,
   patientUserId,
@@ -112,10 +120,10 @@ export const MocapCamera = ({
   const [progressoEsq, setProgressoEsq] = useState(0);
   const [progressoDir, setProgressoDir] = useState(0);
 
-  const [relatorioFinal, setRelatorioFinal] = useState<Array<{ serie: number; corretas: number; compensacoes: number }>>([]);
+  const [relatorioFinal, setRelatorioFinal] = useState<SerieHistory[]>([]);
   const [finalizing, setFinalizing] = useState(false);
 
-  // Refs de memória rápida para o loop 60fps
+  // Refs de sincronização rápida para o loop 60fps
   const exercicioIniciadoRef = useRef(false);
   const menuAbertoRef = useRef(false);
   const emDescansoRef = useRef(false);
@@ -129,11 +137,18 @@ export const MocapCamera = ({
   const estagioRef = useRef("REPOUSO");
   const alertaRef = useRef(false);
   const anguloRef = useRef(0);
-  const repAtualTeveCompensacaoRef = useRef(false);
+  
+  // Memória do Descanso atual para conseguir "Repetir"
+  const duracaoDescansoAtualRef = useRef(10);
   const relogioRef = useRef(-1);
   
-  const historicoSessaoRef = useRef<Array<{ serie: number; corretas: number; compensacoes: number }>>([
-    { serie: 1, corretas: 0, compensacoes: 0 }
+  // Memória de Auditoria de Ciclo (Abre quando sai do repouso, julga quando volta)
+  const cicloAbertoRef = useRef(false);
+  const picoAnguloCicloRef = useRef(0);
+  const compensouTroncoCicloRef = useRef(false);
+  
+  const historicoSessaoRef = useRef<SerieHistory[]>([
+    { serie: 1, corretas: 0, errosExecucao: 0, errosTronco: 0 }
   ]);
   const cronometroRef = useRef({ ativo: false, fim: 0 });
   const ultimoEsqueletoRef = useRef<any[] | null>(null);
@@ -145,9 +160,16 @@ export const MocapCamera = ({
   async function handleFinalizeSession() {
     try {
       setFinalizing(true);
-      const totalCompensacoes = relatorioFinal.reduce((acc, item) => acc + item.compensacoes, 0);
+      
+      const totalCorretas = relatorioFinal.reduce((acc, item) => acc + item.corretas, 0);
+      const totalErrosExec = relatorioFinal.reduce((acc, item) => acc + item.errosExecucao, 0);
+      const totalErrosTronco = relatorioFinal.reduce((acc, item) => acc + item.errosTronco, 0);
+      const totalTentativas = totalCorretas + totalErrosExec;
+      const accuracy = totalTentativas > 0 ? Math.round((totalCorretas / totalTentativas) * 100) : 0;
+
       const alerts: string[] = [];
-      if (totalCompensacoes > 0) alerts.push(`Compensações de tronco detectadas: ${totalCompensacoes}`);
+      if (totalErrosTronco > 0) alerts.push(`Compensações de tronco detectadas: ${totalErrosTronco}`);
+      if (totalErrosExec > 0) alerts.push(`Falhas de amplitude/meta detectadas: ${totalErrosExec}`);
 
       await apiFetch<FinalizeSessionResponse>(`/v1/sessions/${sessionId}/finalize`, {
         method: "POST",
@@ -157,6 +179,7 @@ export const MocapCamera = ({
           rom: Number(configClinica.meta) || 0,
           cadence: null,
           alerts,
+          accuracy, // Enviando a acurácia global calculada para a API
         }),
       });
 
@@ -182,23 +205,19 @@ export const MocapCamera = ({
     return Math.atan2(dx, dy) * (180.0 / Math.PI);
   };
 
-  // Desacoplamento da Postura: agora Unity e Tela reagem visualmente sem corromper a Máquina de Estados.
   const atualizarHUD = (novoEstagio: string, compensando: boolean) => {
     let atualizouEstagio = false;
-
     if (estagioRef.current !== novoEstagio) {
         estagioRef.current = novoEstagio;
         setEstagio(novoEstagio);
         atualizouEstagio = true;
     }
-
     if (alertaRef.current !== compensando) {
         alertaRef.current = compensando;
         setAlertaPostura(compensando);
         if (unityCommRef.current.isLoaded) {
-            if (compensando) {
-                unityCommRef.current.send("ReceptorReact", "ReceberEstadoDoReact", "POSTURA!");
-            } else {
+            if (compensando) unityCommRef.current.send("ReceptorReact", "ReceberEstadoDoReact", "POSTURA!");
+            else {
                 const estadoUnity = (novoEstagio === "DESCANSO" || novoEstagio === "FINALIZADO") ? "REPOUSO" : novoEstagio;
                 unityCommRef.current.send("ReceptorReact", "ReceberEstadoDoReact", estadoUnity);
             }
@@ -339,12 +358,17 @@ export const MocapCamera = ({
         // 3. EXERCÍCIO ATIVO OU DESCANSO
         else {
           
+          // GESTO DE REPETIR TEMPO NO DESCANSO
           if (emDescansoRef.current) {
             if (maoEsqLevantada) {
               contadorGestoEsqRef.current += 1; setProgressoEsq((contadorGestoEsqRef.current / 15) * 100);
               if (contadorGestoEsqRef.current >= 15) {
-                cronometroRef.current.ativo = false; setEmDescanso(false); emDescansoRef.current = false;
-                atualizarHUD("REPOUSO", false);
+                // REINICIA O RELÓGIO COM A DURAÇÃO ORIGINAL!
+                cronometroRef.current = {
+                    ativo: true,
+                    fim: startTimeMs + (duracaoDescansoAtualRef.current * 1000)
+                };
+                setTempoDescansoVisual(duracaoDescansoAtualRef.current);
                 contadorGestoEsqRef.current = 0; setProgressoEsq(0);
               }
             } else { contadorGestoEsqRef.current = 0; setProgressoEsq(0); }
@@ -355,7 +379,6 @@ export const MocapCamera = ({
             } else { contadorGestoDirRef.current = 0; setProgressoDir(0); }
           }
 
-          // AVALIAÇÃO DA FÍSICA (Isolada de Postura)
           const configAtual = configRef.current;
           let ombro, anca, joelho, tornozelo;
           if (configAtual.ladoAtivo === "direito") {
@@ -377,90 +400,102 @@ export const MocapCamera = ({
             }
 
             let estaCompensando = inclinacaoTronco > configAtual.limiteTronco;
-            if (estaCompensando) repAtualTeveCompensacaoRef.current = true;
+            const limiteRepouso = configAtual.repousoMax;
 
-            let estadoFisica = estagioRef.current;
+            // ==============================================================
+            // AUDITORIA DE CICLO (O Padrão Ouro de Análise Biomecânica)
+            // ==============================================================
 
-            if (estadoFisica === "FINALIZADO") {
-               // Aguardando fechamento do Modal
-            } 
-            else if (cronometroRef.current.ativo) {
-              const faltamSecs = Math.ceil((cronometroRef.current.fim - startTimeMs) / 1000);
-              if (faltamSecs > 0) {
-                if (relogioRef.current !== faltamSecs) {
-                    relogioRef.current = faltamSecs;
-                    setTempoDescansoVisual(faltamSecs);
-                }
-                estadoFisica = "DESCANSO"; 
-                estaCompensando = false;
-              } else {
-                cronometroRef.current.ativo = false; 
-                setEmDescanso(false); emDescansoRef.current = false; 
-                estadoFisica = "REPOUSO";
-              }
-            } 
-            else {
-              const metaComTolerancia = configAtual.meta * (1 - (configAtual.tolerancia / 100));
-
-              if (anguloPerna <= configAtual.repousoMax) {
-                  // A adição do SUCESSO aqui blinda contra quedas rápidas de perna entre frames
-                  if (estadoFisica === "RETORNANDO" || estadoFisica === "SUCESSO") {
-                      const acabouSerie = contadorRef.current >= configAtual.repeticoesPorSerie;
-                      
-                      if (acabouSerie) {
-                          if (serieCountRef.current >= configAtual.series) {
-                              estadoFisica = "FINALIZADO";
-                              setRelatorioFinal([...historicoSessaoRef.current]);
-                          } else {
-                              serieCountRef.current += 1; 
-                              setSerieAtual(serieCountRef.current);
-                              historicoSessaoRef.current.push({ serie: serieCountRef.current, corretas: 0, compensacoes: 0 });
-                              
-                              contadorRef.current = 0; setRepeticoes(0);
-                              
-                              cronometroRef.current = { ativo: true, fim: startTimeMs + (configAtual.descansoSerie * 1000) };
-                              setEmDescanso(true); emDescansoRef.current = true;
-                              setTempoDescansoVisual(configAtual.descansoSerie); // Injeção direta corrige tela "0" instantaneamente
-                              estadoFisica = "DESCANSO";
-                          }
-                      } else {
-                          if (configAtual.descansoRepeticao > 0) {
-                              cronometroRef.current = { ativo: true, fim: startTimeMs + (configAtual.descansoRepeticao * 1000) };
-                              setEmDescanso(true); emDescansoRef.current = true;
-                              setTempoDescansoVisual(configAtual.descansoRepeticao);
-                              estadoFisica = "DESCANSO";
-                          } else { 
-                              estadoFisica = "REPOUSO"; 
-                          }
-                      }
-                  } else {
-                      estadoFisica = "REPOUSO";
-                  }
-              } 
-              else if (anguloPerna >= metaComTolerancia) {
-                  if (estadoFisica === "CONTRACAO" || estadoFisica === "REPOUSO") {
-                      estadoFisica = "SUCESSO";
-                      contadorRef.current += 1; 
-                      setRepeticoes(contadorRef.current);
-                      
-                      const idx = serieCountRef.current - 1;
-                      historicoSessaoRef.current[idx].corretas += 1;
-                      if (repAtualTeveCompensacaoRef.current) {
-                          historicoSessaoRef.current[idx].compensacoes += 1;
-                      }
-                      repAtualTeveCompensacaoRef.current = false;
-                  } else if (estadoFisica === "SUCESSO") {
-                      estadoFisica = "SUCESSO";
-                  } else {
-                      estadoFisica = "RETORNANDO";
-                  }
-              } 
-              else {
-                  estadoFisica = (estadoFisica === "REPOUSO" || estadoFisica === "CONTRACAO") ? "CONTRACAO" : "RETORNANDO";
-              }
+            // 1. ABRE O CICLO: Tirou a perna do repouso
+            if (anguloPerna > limiteRepouso && !cicloAbertoRef.current && !emDescansoRef.current && estagioRef.current !== "FINALIZADO") {
+                cicloAbertoRef.current = true;
+                picoAnguloCicloRef.current = anguloPerna;
+                compensouTroncoCicloRef.current = estaCompensando;
             }
 
-            atualizarHUD(estadoFisica, estaCompensando);
+            // 2. DURANTE O CICLO: Monitora o pico e a postura no ar
+            if (cicloAbertoRef.current) {
+                if (anguloPerna > picoAnguloCicloRef.current) picoAnguloCicloRef.current = anguloPerna;
+                if (estaCompensando) compensouTroncoCicloRef.current = true;
+
+                const minMeta = configAtual.meta * (1 - (configAtual.tolerancia / 100));
+                const maxMeta = configAtual.meta * (1 + (configAtual.tolerancia / 100));
+
+                // Display visual em tempo real na tela
+                if (anguloPerna >= minMeta && anguloPerna <= maxMeta) atualizarHUD("SUCESSO", estaCompensando);
+                else if (anguloPerna > maxMeta) atualizarHUD("EXCEDEU META", estaCompensando);
+                else atualizarHUD("CONTRACAO", estaCompensando);
+
+                // 3. FECHA O CICLO: Perna voltou para o repouso (Hora de julgar)
+                if (anguloPerna <= limiteRepouso) {
+                    cicloAbertoRef.current = false;
+
+                    const pico = picoAnguloCicloRef.current;
+                    const idxSerie = serieCountRef.current - 1;
+
+                    // Julgamento A: Erro Biomecânico de Amplitude
+                    if (pico >= minMeta && pico <= maxMeta) {
+                        historicoSessaoRef.current[idxSerie].corretas += 1;
+                    } else {
+                        historicoSessaoRef.current[idxSerie].errosExecucao += 1;
+                    }
+
+                    // Julgamento B: Erro de Compensação Postural
+                    if (compensouTroncoCicloRef.current) {
+                        historicoSessaoRef.current[idxSerie].errosTronco += 1;
+                    }
+
+                    // Pontua a repetição feita
+                    contadorRef.current += 1;
+                    setRepeticoes(contadorRef.current);
+
+                    const acabouSerie = contadorRef.current >= configAtual.repeticoesPorSerie;
+
+                    if (acabouSerie) {
+                        if (serieCountRef.current >= configAtual.series) {
+                            atualizarHUD("FINALIZADO", false);
+                            setRelatorioFinal([...historicoSessaoRef.current]);
+                        } else {
+                            serieCountRef.current += 1; setSerieAtual(serieCountRef.current);
+                            historicoSessaoRef.current.push({ serie: serieCountRef.current, corretas: 0, errosExecucao: 0, errosTronco: 0 });
+
+                            contadorRef.current = 0; setRepeticoes(0);
+
+                            duracaoDescansoAtualRef.current = configAtual.descansoSerie;
+                            cronometroRef.current = { ativo: true, fim: startTimeMs + (configAtual.descansoSerie * 1000) };
+                            setEmDescanso(true); emDescansoRef.current = true;
+                            setTempoDescansoVisual(configAtual.descansoSerie);
+                            atualizarHUD("DESCANSO", false);
+                        }
+                    } else {
+                        if (configAtual.descansoRepeticao > 0) {
+                            duracaoDescansoAtualRef.current = configAtual.descansoRepeticao;
+                            cronometroRef.current = { ativo: true, fim: startTimeMs + (configAtual.descansoRepeticao * 1000) };
+                            setEmDescanso(true); emDescansoRef.current = true;
+                            setTempoDescansoVisual(configAtual.descansoRepeticao);
+                            atualizarHUD("DESCANSO", false);
+                        } else {
+                            atualizarHUD("REPOUSO", false);
+                        }
+                    }
+                }
+            } 
+            // Fora de ciclo e de descanso = Repouso
+            else if (!emDescansoRef.current && estagioRef.current !== "FINALIZADO") {
+                if (cronometroRef.current.ativo) {
+                    const faltamSecs = Math.ceil((cronometroRef.current.fim - startTimeMs) / 1000);
+                    if (faltamSecs > 0) {
+                        if (relogioRef.current !== faltamSecs) {
+                            relogioRef.current = faltamSecs; setTempoDescansoVisual(faltamSecs);
+                        }
+                    } else {
+                        cronometroRef.current.ativo = false; setEmDescanso(false); emDescansoRef.current = false;
+                        atualizarHUD("REPOUSO", false);
+                    }
+                } else {
+                    atualizarHUD("REPOUSO", estaCompensando);
+                }
+            }
 
             ctx.fillStyle = "#FFFFFF"; ctx.font = "bold 30px Arial"; ctx.lineWidth = 3;
             ctx.save(); ctx.translate(joelho.x * canvas.width + 20, joelho.y * canvas.height); ctx.scale(-1, 1);
@@ -521,7 +556,7 @@ export const MocapCamera = ({
             </div>
           )}
 
-          {/* UI 2: OVERLAY DE DESCANSO */}
+          {/* UI 2: OVERLAY DE DESCANSO (Com botão de Repetir Pausa) */}
           {exercicioIniciado && emDescanso && relatorioFinal.length === 0 && !menuAberto && (
             <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.85)', zIndex: 35, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(8px)' }}>
                 <div style={{ fontSize: '70px', marginBottom: '5px' }}>⏳</div>
@@ -530,7 +565,7 @@ export const MocapCamera = ({
 
                 <div style={{ marginTop: '15px', backgroundColor: 'rgba(255,255,255,0.08)', padding: '15px 40px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <span style={{ fontSize: '45px', marginBottom: '5px' }}>✋🏽</span>
-                    <p style={{ color: '#ddd', fontSize: '1.1rem', margin: '0 0 10px 0', textAlign: 'center' }}>Mão Esquerda<br /><b style={{ color: '#67B5A2' }}>PULAR DESCANSO</b></p>
+                    <p style={{ color: '#ddd', fontSize: '1.1rem', margin: '0 0 10px 0', textAlign: 'center' }}>Mão Esquerda<br /><b style={{ color: '#67B5A2' }}>REPETIR PAUSA</b></p>
                     <div style={{ width: '150px', height: '12px', backgroundColor: '#333', borderRadius: '6px', overflow: 'hidden' }}>
                         <div style={{ width: `${progressoEsq}%`, height: '100%', backgroundColor: '#67B5A2', transition: 'width 0.1s linear' }} />
                     </div>
@@ -561,29 +596,37 @@ export const MocapCamera = ({
             </div>
           )}
 
-          {/* UI 4: POPUP DE RELATÓRIO FINAL */}
+          {/* UI 4: POPUP DE RELATÓRIO FINAL (Com 5 colunas de precisão) */}
           {relatorioFinal.length > 0 && (
             <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.85)', zIndex: 60, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(8px)' }}>
-                <div style={{ backgroundColor: '#2b3d3b', padding: '30px', borderRadius: '20px', border: '4px solid #67B5A2', width: '85%', maxWidth: '700px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 20px 50px #000' }}>
-                    <h2 style={{ color: 'white', fontSize: '2.2rem', margin: '0 0 5px 0', textAlign: 'center' }}>Sessão Concluída!</h2>
-                    <p style={{ color: '#ccc', marginBottom: '20px', fontSize: '1.1rem' }}>Resumo de contração e controle de tronco:</p>
+                <div style={{ backgroundColor: '#2b3d3b', padding: '35px', borderRadius: '20px', border: '4px solid #67B5A2', width: '90%', maxWidth: '800px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 20px 50px #000' }}>
+                    <h2 style={{ color: 'white', fontSize: '2.2rem', margin: '0 0 5px 0', textAlign: 'center' }}>Sessão Concluída com Sucesso!</h2>
+                    <p style={{ color: '#ccc', marginBottom: '25px', fontSize: '1.1rem' }}>Desdobramento analítico de erros biomecânicos e posturais:</p>
 
-                    <table style={{ width: '100%', color: 'white', borderCollapse: 'collapse', textAlign: 'center', marginBottom: '30px', fontSize: '1rem' }}>
+                    <table style={{ width: '100%', color: 'white', borderCollapse: 'collapse', textAlign: 'center', marginBottom: '35px', fontSize: '1rem' }}>
                         <thead>
                             <tr style={{ borderBottom: '3px solid #444', backgroundColor: '#111' }}>
-                                <th style={{ padding: '12px' }}>Série</th>
-                                <th style={{ padding: '12px', color: '#22c55e' }}>Extensões Atingidas</th>
-                                <th style={{ padding: '12px', color: '#f59e0b' }}>Compensações (Tronco)</th>
+                                <th style={{ padding: '14px' }}>Série</th>
+                                <th style={{ padding: '14px', color: '#22c55e' }}>Corretas</th>
+                                <th style={{ padding: '14px', color: '#ef4444' }}>Erro (Execução)</th>
+                                <th style={{ padding: '14px', color: '#f59e0b' }}>Erro (Tronco)</th>
+                                <th style={{ padding: '14px', color: '#3b82f6' }}>Acurácia</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {relatorioFinal.map((r, i) => (
-                                <tr key={i} style={{ borderBottom: '1px solid #333', backgroundColor: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.03)' }}>
-                                    <td style={{ padding: '15px', fontWeight: 'bold' }}>{r.serie}</td>
-                                    <td style={{ padding: '15px', fontWeight: 'bold', fontSize: '1.4rem', color: '#22c55e' }}>{r.corretas}</td>
-                                    <td style={{ padding: '15px', fontSize: '1.3rem', color: r.compensacoes > 0 ? '#ef4444' : '#fff' }}>{r.compensacoes}</td>
-                                </tr>
-                            ))}
+                            {relatorioFinal.map((r, i) => {
+                                const totalTentativas = r.corretas + r.errosExecucao;
+                                const acuracia = totalTentativas > 0 ? Math.round((r.corretas / totalTentativas) * 100) : 0;
+                                return (
+                                    <tr key={i} style={{ borderBottom: '1px solid #333', backgroundColor: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.03)' }}>
+                                        <td style={{ padding: '15px', fontWeight: 'bold' }}>{r.serie}</td>
+                                        <td style={{ padding: '15px', fontWeight: 'bold', fontSize: '1.3rem', color: '#22c55e' }}>{r.corretas}</td>
+                                        <td style={{ padding: '15px', fontSize: '1.2rem', color: r.errosExecucao > 0 ? '#ef4444' : '#fff' }}>{r.errosExecucao}</td>
+                                        <td style={{ padding: '15px', fontSize: '1.2rem', color: r.errosTronco > 0 ? '#f59e0b' : '#fff' }}>{r.errosTronco}</td>
+                                        <td style={{ padding: '15px', fontWeight: 'bold', fontSize: '1.3rem', color: '#3b82f6' }}>{acuracia}%</td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                     <button onClick={handleFinalizeSession} disabled={finalizing} style={{ padding: '15px 40px', fontSize: '1.3rem', backgroundColor: '#67B5A2', color: 'white', border: 'none', borderRadius: '10px', cursor: finalizing ? 'not-allowed' : 'pointer', fontWeight: 'bold', boxShadow: '0 10px 20px rgba(0,0,0,0.5)' }}>
@@ -628,7 +671,7 @@ export const MocapCamera = ({
 
                 <div style={{ textAlign: 'center', minWidth: '150px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                     <div style={{ color: '#aaa', fontSize: '11px', fontWeight: 'bold', letterSpacing: '1px' }}>ESTADO</div>
-                    <div style={{ color: alertaPostura ? "#ef4444" : estagio === "SUCESSO" ? "#22c55e" : "#ea580c", fontSize: '18px', fontWeight: 'bold', marginTop: '3px', textTransform: 'uppercase' }}>
+                    <div style={{ color: alertaPostura ? "#ef4444" : estagio === "SUCESSO" ? "#22c55e" : estagio === "EXCEDEU META" ? "#ef4444" : "#ea580c", fontSize: '18px', fontWeight: 'bold', marginTop: '3px', textTransform: 'uppercase' }}>
                         {alertaPostura ? "POSTURA!" : estagio}
                     </div>
                     <div style={{ color: '#fbbf24', fontSize: '12px', marginTop: '5px', fontWeight: 'bold' }}>Ângulo do joelho: {anguloAtualDisplay}°</div>
