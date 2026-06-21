@@ -67,15 +67,15 @@ export const MocapCamera = ({
   // PARÂMETROS CLÍNICOS
   // ========================================================
   const [configClinica, setConfigClinica] = useState({
-    ladoAtivo: "direito" as "direito" | "esquerdo",
+    ladoAtivo: "esquerdo" as "direito" | "esquerdo",
     repousoMax: 110,
-    meta: 145,
+    meta: 140,
     tolerancia: 5,
     limiteTronco: 15,
-    series: 1,
+    series: 5,
     repeticoesPorSerie: 5,
     descansoRepeticao: 3, 
-    descansoSerie: 30     
+    descansoSerie: 10     
   });
 
   function normalizarLadoAtivo(valor?: string | null): "direito" | "esquerdo" {
@@ -105,7 +105,7 @@ export const MocapCamera = ({
   const [alertaPostura, setAlertaPostura] = useState(false);
   const [anguloAtualDisplay, setAnguloAtualDisplay] = useState(0);
   
-  // Estados de Pausa e Descanso importados do PassadaLateral
+  // Estados de Pausa e Descanso
   const [menuAberto, setMenuAberto] = useState(false);
   const [emDescanso, setEmDescanso] = useState(false);
   const [tempoDescansoVisual, setTempoDescansoVisual] = useState(0);
@@ -184,7 +184,8 @@ export const MocapCamera = ({
     return Math.atan2(dx, dy) * (180.0 / Math.PI);
   };
 
-  const atualizarHUD = (novoEstagio: string, novoContador: number, compensando: boolean) => {
+  // Removido o parâmetro contador daqui para evitar dessincronização da interface
+  const atualizarHUD = (novoEstagio: string, compensando: boolean) => {
     if (estagioRef.current !== novoEstagio) {
       estagioRef.current = novoEstagio;
       setEstagio(novoEstagio);
@@ -192,10 +193,6 @@ export const MocapCamera = ({
         const estadoUnity = (novoEstagio === "DESCANSO" || novoEstagio === "FINALIZADO") ? "REPOUSO" : novoEstagio;
         unityCommRef.current.send("ReceptorReact", "ReceberEstadoDoReact", estadoUnity);
       }
-    }
-    if (contadorRef.current !== novoContador) {
-      contadorRef.current = novoContador;
-      setRepeticoes(novoContador);
     }
     if (alertaRef.current !== compensando) {
       alertaRef.current = compensando;
@@ -301,7 +298,6 @@ export const MocapCamera = ({
         utils.drawConnectors(esqueletoSuavizado, PoseLandmarker.POSE_CONNECTIONS, { color: "#00FF00", lineWidth: 4 });
         utils.drawLandmarks(esqueletoSuavizado, { color: "#FF0000", radius: 4 });
 
-        // LEITURA DE GESTOS (Mãos e Ombros)
         const nariz = esqueletoSuavizado[0];
         const ombroEsq = esqueletoSuavizado[11]; const ombroDir = esqueletoSuavizado[12];
         const pulsoEsq = esqueletoSuavizado[15]; const pulsoDir = esqueletoSuavizado[16];
@@ -320,6 +316,7 @@ export const MocapCamera = ({
             }
           } else { contadorGestoInicioRef.current = 0; setProgressoInicio(0); }
         }
+        
         // 2. MENU DE PAUSA ABERTO
         else if (menuAbertoRef.current) {
           if (maoEsqLevantada) {
@@ -332,26 +329,29 @@ export const MocapCamera = ({
             if (contadorGestoDirRef.current >= 15) { setMenuAberto(false); handleFinalizeSession(); }
           } else { contadorGestoDirRef.current = 0; setProgressoDir(0); }
         }
-        // 3. TELA DE DESCANSO
-        else if (emDescansoRef.current) {
-          if (maoEsqLevantada) {
-            contadorGestoEsqRef.current += 1; setProgressoEsq((contadorGestoEsqRef.current / 15) * 100);
-            if (contadorGestoEsqRef.current >= 15) {
-              // Pular o descanso!
-              cronometroRef.current.ativo = false; setEmDescanso(false); emDescansoRef.current = false;
-              atualizarHUD("REPOUSO", contadorRef.current, false);
-              contadorGestoEsqRef.current = 0; setProgressoEsq(0);
-            }
-          } else { contadorGestoEsqRef.current = 0; setProgressoEsq(0); }
-        }
-        // 4. EXERCÍCIO ATIVO
+        
+        // 3. EXERCÍCIO ATIVO OU DESCANSO
         else {
-          // Gesto para invocar Pausa
-          if (maoDirLevantada && estagioRef.current !== "FINALIZADO") {
-            contadorGestoDirRef.current += 1; setProgressoDir((contadorGestoDirRef.current / 20) * 100);
-            if (contadorGestoDirRef.current >= 20) { setMenuAberto(true); contadorGestoDirRef.current = 0; setProgressoDir(0); }
-          } else { contadorGestoDirRef.current = 0; setProgressoDir(0); }
+          
+          // Tratamento independente dos Gestos de Pausa ou Pulo
+          if (emDescansoRef.current) {
+            if (maoEsqLevantada) {
+              contadorGestoEsqRef.current += 1; setProgressoEsq((contadorGestoEsqRef.current / 15) * 100);
+              if (contadorGestoEsqRef.current >= 15) {
+                // Ação de pular ativada!
+                cronometroRef.current.ativo = false; setEmDescanso(false); emDescansoRef.current = false;
+                atualizarHUD("REPOUSO", false);
+                contadorGestoEsqRef.current = 0; setProgressoEsq(0);
+              }
+            } else { contadorGestoEsqRef.current = 0; setProgressoEsq(0); }
+          } else {
+            if (maoDirLevantada && estagioRef.current !== "FINALIZADO") {
+              contadorGestoDirRef.current += 1; setProgressoDir((contadorGestoDirRef.current / 20) * 100);
+              if (contadorGestoDirRef.current >= 20) { setMenuAberto(true); contadorGestoDirRef.current = 0; setProgressoDir(0); }
+            } else { contadorGestoDirRef.current = 0; setProgressoDir(0); }
+          }
 
+          // AVALIAÇÃO DA FÍSICA E TEMPO (Processada simultaneamente e independentemente dos gestos)
           const configAtual = configRef.current;
           let ombro, anca, joelho, tornozelo;
           if (configAtual.ladoAtivo === "direito") {
@@ -378,16 +378,17 @@ export const MocapCamera = ({
             let estadoTemp = estagioRef.current;
 
             if (estadoTemp === "FINALIZADO") {
-              atualizarHUD("FINALIZADO", contadorRef.current, false);
+              atualizarHUD("FINALIZADO", false);
             } 
             else if (cronometroRef.current.ativo) {
+              // Relógio processado perfeitamente a 60fps!
               const faltamSecs = Math.ceil((cronometroRef.current.fim - startTimeMs) / 1000);
               if (faltamSecs > 0) {
                 setTempoDescansoVisual(faltamSecs); estadoTemp = "DESCANSO"; estaCompensando = false;
               } else {
                 cronometroRef.current.ativo = false; setEmDescanso(false); emDescansoRef.current = false; estadoTemp = "REPOUSO";
               }
-              atualizarHUD(estadoTemp, contadorRef.current, estaCompensando);
+              atualizarHUD(estadoTemp, estaCompensando);
             } 
             else {
               const metaComTolerancia = configAtual.meta * (1 - (configAtual.tolerancia / 100));
@@ -397,6 +398,7 @@ export const MocapCamera = ({
                 if (anguloPerna <= configAtual.repousoMax) {
                   if (estadoTemp === "RETORNANDO") {
                     const acabouSerie = contadorRef.current >= configAtual.repeticoesPorSerie;
+                    
                     if (acabouSerie) {
                       if (serieCountRef.current >= configAtual.series) {
                         estadoTemp = "FINALIZADO";
@@ -404,7 +406,10 @@ export const MocapCamera = ({
                       } else {
                         serieCountRef.current += 1; setSerieAtual(serieCountRef.current);
                         historicoSessaoRef.current.push({ serie: serieCountRef.current, corretas: 0, compensacoes: 0 });
-                        contadorRef.current = 0;
+                        
+                        // FIX: Zero repetições explícito para interface
+                        contadorRef.current = 0; setRepeticoes(0);
+                        
                         cronometroRef.current = { ativo: true, fim: startTimeMs + (configAtual.descansoSerie * 1000) };
                         setEmDescanso(true); emDescansoRef.current = true; estadoTemp = "DESCANSO";
                       }
@@ -419,7 +424,10 @@ export const MocapCamera = ({
                 else if (anguloPerna >= metaComTolerancia) {
                   if (estadoTemp === "CONTRACAO" || estadoTemp === "REPOUSO") {
                     estadoTemp = "SUCESSO";
-                    contadorRef.current += 1;
+                    
+                    // FIX: Somando a repetição e enviando diretamente para o painel Front-End 
+                    contadorRef.current += 1; setRepeticoes(contadorRef.current); 
+                    
                     const idx = serieCountRef.current - 1;
                     historicoSessaoRef.current[idx].corretas += 1;
                     if (repAtualTeveCompensacaoRef.current) historicoSessaoRef.current[idx].compensacoes += 1;
@@ -430,9 +438,10 @@ export const MocapCamera = ({
                   estadoTemp = (estadoTemp === "REPOUSO" || estadoTemp === "CONTRACAO") ? "CONTRACAO" : "RETORNANDO";
                 }
               }
-              atualizarHUD(estadoTemp, contadorRef.current, estaCompensando);
+              atualizarHUD(estadoTemp, estaCompensando);
             }
 
+            // Desenhos no Canvas
             ctx.fillStyle = "#FFFFFF"; ctx.font = "bold 30px Arial"; ctx.lineWidth = 3;
             ctx.save(); ctx.translate(joelho.x * canvas.width + 20, joelho.y * canvas.height); ctx.scale(-1, 1);
             ctx.fillText(Math.round(anguloPerna) + "°", 0, 0); ctx.restore();
