@@ -94,7 +94,7 @@ export const MocapCamera = ({
   }, [configClinica.ladoAtivo, isUnityLoaded]);
 
   // ========================================================
-  // ESTADOS DO HUD, GESTOS E RELATÓRIO
+  // ESTADOS DO HUD E RELATÓRIO
   // ========================================================
   const [exercicioIniciado, setExercicioIniciado] = useState(false);
   const [progressoInicio, setProgressoInicio] = useState(0);
@@ -112,14 +112,14 @@ export const MocapCamera = ({
   const [progressoEsq, setProgressoEsq] = useState(0);
   const [progressoDir, setProgressoDir] = useState(0);
 
-  // Histórico para alimentar a Tabela Final
   const [relatorioFinal, setRelatorioFinal] = useState<Array<{ serie: number; corretas: number; compensacoes: number }>>([]);
   const [finalizing, setFinalizing] = useState(false);
 
-  // Refs de sincronização rápida para o loop de 60fps
+  // Refs de memória rápida para o loop 60fps
   const exercicioIniciadoRef = useRef(false);
   const menuAbertoRef = useRef(false);
   const emDescansoRef = useRef(false);
+  
   const contadorGestoEsqRef = useRef(0);
   const contadorGestoDirRef = useRef(0);
   const contadorGestoInicioRef = useRef(0);
@@ -130,6 +130,7 @@ export const MocapCamera = ({
   const alertaRef = useRef(false);
   const anguloRef = useRef(0);
   const repAtualTeveCompensacaoRef = useRef(false);
+  const relogioRef = useRef(-1);
   
   const historicoSessaoRef = useRef<Array<{ serie: number; corretas: number; compensacoes: number }>>([
     { serie: 1, corretas: 0, compensacoes: 0 }
@@ -146,9 +147,7 @@ export const MocapCamera = ({
       setFinalizing(true);
       const totalCompensacoes = relatorioFinal.reduce((acc, item) => acc + item.compensacoes, 0);
       const alerts: string[] = [];
-      if (totalCompensacoes > 0) {
-        alerts.push(`Compensações de tronco detectadas: ${totalCompensacoes}`);
-      }
+      if (totalCompensacoes > 0) alerts.push(`Compensações de tronco detectadas: ${totalCompensacoes}`);
 
       await apiFetch<FinalizeSessionResponse>(`/v1/sessions/${sessionId}/finalize`, {
         method: "POST",
@@ -174,8 +173,7 @@ export const MocapCamera = ({
     const radianos = Math.atan2(pontoC.y - pontoB.y, pontoC.x - pontoB.x) -
                      Math.atan2(pontoA.y - pontoB.y, pontoA.x - pontoB.x);
     let angulo = Math.abs(radianos * 180.0 / Math.PI);
-    if (angulo > 180.0) angulo = 360.0 - angulo;
-    return angulo;
+    return angulo > 180.0 ? 360.0 - angulo : angulo;
   };
 
   const calcularInclinacaoTronco = (ombro: any, anca: any) => {
@@ -184,22 +182,30 @@ export const MocapCamera = ({
     return Math.atan2(dx, dy) * (180.0 / Math.PI);
   };
 
-  // Removido o parâmetro contador daqui para evitar dessincronização da interface
+  // Desacoplamento da Postura: agora Unity e Tela reagem visualmente sem corromper a Máquina de Estados.
   const atualizarHUD = (novoEstagio: string, compensando: boolean) => {
+    let atualizouEstagio = false;
+
     if (estagioRef.current !== novoEstagio) {
-      estagioRef.current = novoEstagio;
-      setEstagio(novoEstagio);
-      if (unityCommRef.current.isLoaded) {
+        estagioRef.current = novoEstagio;
+        setEstagio(novoEstagio);
+        atualizouEstagio = true;
+    }
+
+    if (alertaRef.current !== compensando) {
+        alertaRef.current = compensando;
+        setAlertaPostura(compensando);
+        if (unityCommRef.current.isLoaded) {
+            if (compensando) {
+                unityCommRef.current.send("ReceptorReact", "ReceberEstadoDoReact", "POSTURA!");
+            } else {
+                const estadoUnity = (novoEstagio === "DESCANSO" || novoEstagio === "FINALIZADO") ? "REPOUSO" : novoEstagio;
+                unityCommRef.current.send("ReceptorReact", "ReceberEstadoDoReact", estadoUnity);
+            }
+        }
+    } else if (atualizouEstagio && unityCommRef.current.isLoaded && !compensando) {
         const estadoUnity = (novoEstagio === "DESCANSO" || novoEstagio === "FINALIZADO") ? "REPOUSO" : novoEstagio;
         unityCommRef.current.send("ReceptorReact", "ReceberEstadoDoReact", estadoUnity);
-      }
-    }
-    if (alertaRef.current !== compensando) {
-      alertaRef.current = compensando;
-      setAlertaPostura(compensando);
-      if (compensando && unityCommRef.current.isLoaded) {
-        unityCommRef.current.send("ReceptorReact", "ReceberEstadoDoReact", "POSTURA!");
-      }
     }
   };
 
@@ -333,12 +339,10 @@ export const MocapCamera = ({
         // 3. EXERCÍCIO ATIVO OU DESCANSO
         else {
           
-          // Tratamento independente dos Gestos de Pausa ou Pulo
           if (emDescansoRef.current) {
             if (maoEsqLevantada) {
               contadorGestoEsqRef.current += 1; setProgressoEsq((contadorGestoEsqRef.current / 15) * 100);
               if (contadorGestoEsqRef.current >= 15) {
-                // Ação de pular ativada!
                 cronometroRef.current.ativo = false; setEmDescanso(false); emDescansoRef.current = false;
                 atualizarHUD("REPOUSO", false);
                 contadorGestoEsqRef.current = 0; setProgressoEsq(0);
@@ -351,7 +355,7 @@ export const MocapCamera = ({
             } else { contadorGestoDirRef.current = 0; setProgressoDir(0); }
           }
 
-          // AVALIAÇÃO DA FÍSICA E TEMPO (Processada simultaneamente e independentemente dos gestos)
+          // AVALIAÇÃO DA FÍSICA (Isolada de Postura)
           const configAtual = configRef.current;
           let ombro, anca, joelho, tornozelo;
           if (configAtual.ladoAtivo === "direito") {
@@ -375,73 +379,89 @@ export const MocapCamera = ({
             let estaCompensando = inclinacaoTronco > configAtual.limiteTronco;
             if (estaCompensando) repAtualTeveCompensacaoRef.current = true;
 
-            let estadoTemp = estagioRef.current;
+            let estadoFisica = estagioRef.current;
 
-            if (estadoTemp === "FINALIZADO") {
-              atualizarHUD("FINALIZADO", false);
+            if (estadoFisica === "FINALIZADO") {
+               // Aguardando fechamento do Modal
             } 
             else if (cronometroRef.current.ativo) {
-              // Relógio processado perfeitamente a 60fps!
               const faltamSecs = Math.ceil((cronometroRef.current.fim - startTimeMs) / 1000);
               if (faltamSecs > 0) {
-                setTempoDescansoVisual(faltamSecs); estadoTemp = "DESCANSO"; estaCompensando = false;
+                if (relogioRef.current !== faltamSecs) {
+                    relogioRef.current = faltamSecs;
+                    setTempoDescansoVisual(faltamSecs);
+                }
+                estadoFisica = "DESCANSO"; 
+                estaCompensando = false;
               } else {
-                cronometroRef.current.ativo = false; setEmDescanso(false); emDescansoRef.current = false; estadoTemp = "REPOUSO";
+                cronometroRef.current.ativo = false; 
+                setEmDescanso(false); emDescansoRef.current = false; 
+                estadoFisica = "REPOUSO";
               }
-              atualizarHUD(estadoTemp, estaCompensando);
             } 
             else {
               const metaComTolerancia = configAtual.meta * (1 - (configAtual.tolerancia / 100));
 
-              if (estaCompensando) { estadoTemp = "POSTURA!"; } 
-              else {
-                if (anguloPerna <= configAtual.repousoMax) {
-                  if (estadoTemp === "RETORNANDO") {
-                    const acabouSerie = contadorRef.current >= configAtual.repeticoesPorSerie;
-                    
-                    if (acabouSerie) {
-                      if (serieCountRef.current >= configAtual.series) {
-                        estadoTemp = "FINALIZADO";
-                        setRelatorioFinal([...historicoSessaoRef.current]);
+              if (anguloPerna <= configAtual.repousoMax) {
+                  // A adição do SUCESSO aqui blinda contra quedas rápidas de perna entre frames
+                  if (estadoFisica === "RETORNANDO" || estadoFisica === "SUCESSO") {
+                      const acabouSerie = contadorRef.current >= configAtual.repeticoesPorSerie;
+                      
+                      if (acabouSerie) {
+                          if (serieCountRef.current >= configAtual.series) {
+                              estadoFisica = "FINALIZADO";
+                              setRelatorioFinal([...historicoSessaoRef.current]);
+                          } else {
+                              serieCountRef.current += 1; 
+                              setSerieAtual(serieCountRef.current);
+                              historicoSessaoRef.current.push({ serie: serieCountRef.current, corretas: 0, compensacoes: 0 });
+                              
+                              contadorRef.current = 0; setRepeticoes(0);
+                              
+                              cronometroRef.current = { ativo: true, fim: startTimeMs + (configAtual.descansoSerie * 1000) };
+                              setEmDescanso(true); emDescansoRef.current = true;
+                              setTempoDescansoVisual(configAtual.descansoSerie); // Injeção direta corrige tela "0" instantaneamente
+                              estadoFisica = "DESCANSO";
+                          }
                       } else {
-                        serieCountRef.current += 1; setSerieAtual(serieCountRef.current);
-                        historicoSessaoRef.current.push({ serie: serieCountRef.current, corretas: 0, compensacoes: 0 });
-                        
-                        // FIX: Zero repetições explícito para interface
-                        contadorRef.current = 0; setRepeticoes(0);
-                        
-                        cronometroRef.current = { ativo: true, fim: startTimeMs + (configAtual.descansoSerie * 1000) };
-                        setEmDescanso(true); emDescansoRef.current = true; estadoTemp = "DESCANSO";
+                          if (configAtual.descansoRepeticao > 0) {
+                              cronometroRef.current = { ativo: true, fim: startTimeMs + (configAtual.descansoRepeticao * 1000) };
+                              setEmDescanso(true); emDescansoRef.current = true;
+                              setTempoDescansoVisual(configAtual.descansoRepeticao);
+                              estadoFisica = "DESCANSO";
+                          } else { 
+                              estadoFisica = "REPOUSO"; 
+                          }
                       }
-                    } else {
-                      if (configAtual.descansoRepeticao > 0) {
-                        cronometroRef.current = { ativo: true, fim: startTimeMs + (configAtual.descansoRepeticao * 1000) };
-                        setEmDescanso(true); emDescansoRef.current = true; estadoTemp = "DESCANSO";
-                      } else { estadoTemp = "REPOUSO"; }
-                    }
-                  } else { estadoTemp = "REPOUSO"; }
-                } 
-                else if (anguloPerna >= metaComTolerancia) {
-                  if (estadoTemp === "CONTRACAO" || estadoTemp === "REPOUSO") {
-                    estadoTemp = "SUCESSO";
-                    
-                    // FIX: Somando a repetição e enviando diretamente para o painel Front-End 
-                    contadorRef.current += 1; setRepeticoes(contadorRef.current); 
-                    
-                    const idx = serieCountRef.current - 1;
-                    historicoSessaoRef.current[idx].corretas += 1;
-                    if (repAtualTeveCompensacaoRef.current) historicoSessaoRef.current[idx].compensacoes += 1;
-                    repAtualTeveCompensacaoRef.current = false;
-                  } else { estadoTemp = estadoTemp === "SUCESSO" ? "SUCESSO" : "RETORNANDO"; }
-                }
-                else {
-                  estadoTemp = (estadoTemp === "REPOUSO" || estadoTemp === "CONTRACAO") ? "CONTRACAO" : "RETORNANDO";
-                }
+                  } else {
+                      estadoFisica = "REPOUSO";
+                  }
+              } 
+              else if (anguloPerna >= metaComTolerancia) {
+                  if (estadoFisica === "CONTRACAO" || estadoFisica === "REPOUSO") {
+                      estadoFisica = "SUCESSO";
+                      contadorRef.current += 1; 
+                      setRepeticoes(contadorRef.current);
+                      
+                      const idx = serieCountRef.current - 1;
+                      historicoSessaoRef.current[idx].corretas += 1;
+                      if (repAtualTeveCompensacaoRef.current) {
+                          historicoSessaoRef.current[idx].compensacoes += 1;
+                      }
+                      repAtualTeveCompensacaoRef.current = false;
+                  } else if (estadoFisica === "SUCESSO") {
+                      estadoFisica = "SUCESSO";
+                  } else {
+                      estadoFisica = "RETORNANDO";
+                  }
+              } 
+              else {
+                  estadoFisica = (estadoFisica === "REPOUSO" || estadoFisica === "CONTRACAO") ? "CONTRACAO" : "RETORNANDO";
               }
-              atualizarHUD(estadoTemp, estaCompensando);
             }
 
-            // Desenhos no Canvas
+            atualizarHUD(estadoFisica, estaCompensando);
+
             ctx.fillStyle = "#FFFFFF"; ctx.font = "bold 30px Arial"; ctx.lineWidth = 3;
             ctx.save(); ctx.translate(joelho.x * canvas.width + 20, joelho.y * canvas.height); ctx.scale(-1, 1);
             ctx.fillText(Math.round(anguloPerna) + "°", 0, 0); ctx.restore();
@@ -584,7 +604,7 @@ export const MocapCamera = ({
             </div>
           )}
 
-          {/* UI 6: HUD SUPERIOR GLASSMORPHISM COM INDICADOR DE PERNA */}
+          {/* UI 6: HUD SUPERIOR GLASSMORPHISM */}
           {exercicioIniciado && (
             <div style={{ position: 'absolute', top: '15px', left: '50%', transform: 'translateX(-50%)', zIndex: 20, backgroundColor: 'rgba(26, 26, 26, 0.95)', padding: '12px 28px', borderRadius: '15px', border: '3px solid #67B5A2', display: 'flex', gap: '25px', boxShadow: '0 10px 20px rgba(0,0,0,0.6)' }}>
                 <div style={{ borderRight: '1px solid rgba(255,255,255,0.2)', paddingRight: '20px', textAlign: 'center' }}>
@@ -592,7 +612,6 @@ export const MocapCamera = ({
                     <div style={{ color: 'white', fontSize: '30px', fontWeight: 'bold' }}>{serieAtual} <span style={{ fontSize: '16px', color: '#888' }}>/ {configClinica.series}</span></div>
                 </div>
 
-                {/* SINALIZADOR DA PERNA ESQUERDA */}
                 <div style={{ borderRight: '1px solid rgba(255,255,255,0.2)', paddingRight: '20px', textAlign: 'center', opacity: isEsq ? 1 : 0.35, transition: 'opacity 0.3s' }}>
                     <div style={{ color: isEsq ? '#B02CA0' : '#aaa', fontSize: '11px', fontWeight: 'bold', letterSpacing: '1px' }}>◀ ESQUERDA</div>
                     <div style={{ color: isEsq ? '#B02CA0' : '#777', fontSize: '30px', fontWeight: 'bold' }}>
@@ -600,7 +619,6 @@ export const MocapCamera = ({
                     </div>
                 </div>
 
-                {/* SINALIZADOR DA PERNA DIREITA */}
                 <div style={{ borderRight: '1px solid rgba(255,255,255,0.2)', paddingRight: '20px', textAlign: 'center', opacity: isDir ? 1 : 0.35, transition: 'opacity 0.3s' }}>
                     <div style={{ color: isDir ? '#D9BB4E' : '#aaa', fontSize: '11px', fontWeight: 'bold', letterSpacing: '1px' }}>DIREITA ▶</div>
                     <div style={{ color: isDir ? '#D9BB4E' : '#777', fontSize: '30px', fontWeight: 'bold' }}>
@@ -622,7 +640,7 @@ export const MocapCamera = ({
           <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', transform: 'scaleX(-1)', objectFit: 'cover' }} />
         </div>
 
-        {/* PAINEL CLÍNICO (Mantido na base da coluna esquerda) */}
+        {/* PAINEL CLÍNICO */}
         <div style={{ flexShrink: 0, padding: '15px 25px', borderTop: '2px solid #67B5A2', boxSizing: 'border-box', backgroundColor: '#f9fafb', overflowY: 'auto' }}>
           <h3 style={{ marginTop: 0, marginBottom: '12px', color: '#111827', fontSize: '1.1rem', borderBottom: '2px solid #67B5A2', paddingBottom: '6px', fontWeight: 'bold' }}>
             Ajuste Clínico da Sessão
